@@ -1,0 +1,9 @@
+_build
+deps
+.git
+.github
+k8s
+*.tar
+.elixir_ls
+erl_crash.dump
+README.md
