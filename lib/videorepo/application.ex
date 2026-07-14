@@ -17,6 +17,7 @@ defmodule Videorepo.Application do
     Logger.info("videorepo escuchando en :#{port} — storage: #{dir}")
 
     children = [
+      Videorepo.Jobs,
       # read_timeout amplio: subidas grandes por WiFi no se cortan por inactividad
       {Bandit, plug: Videorepo.Router, scheme: :http, port: port,
        thousand_island_options: [read_timeout: 300_000]}

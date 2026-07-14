@@ -30,7 +30,20 @@ spec:
               echo "[boot] instalando ca-certificates (la imagen slim no los trae)"
               export DEBIAN_FRONTEND=noninteractive
               for i in 1 2 3; do apt-get update && break; sleep 3; done
-              apt-get install -y --no-install-recommends ca-certificates
+              apt-get install -y --no-install-recommends ca-certificates curl xz-utils
+              echo "[boot] herramientas (ffmpeg + yt-dlp) en el PVC (una sola vez)"
+              mkdir -p "$TOOLS_DIR"
+              if [ ! -x "$TOOLS_DIR/ffmpeg" ]; then
+                curl -fsSL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ff.tar.xz \
+                  && mkdir -p /tmp/ffx && tar -xf /tmp/ff.tar.xz -C /tmp/ffx --strip-components=1 \
+                  && cp /tmp/ffx/ffmpeg /tmp/ffx/ffprobe "$TOOLS_DIR/" && rm -rf /tmp/ff.tar.xz /tmp/ffx \
+                  || echo "[boot] WARN: fallo la descarga de ffmpeg"
+              fi
+              if [ ! -x "$TOOLS_DIR/yt-dlp" ]; then
+                curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o "$TOOLS_DIR/yt-dlp" \
+                  && chmod +x "$TOOLS_DIR/yt-dlp" || echo "[boot] WARN: fallo la descarga de yt-dlp"
+              fi
+              export PATH="$TOOLS_DIR:$PATH"
               echo "[boot] copiando fuente a /app"
               mkdir -p /app
               cp -rL /src/mix.exs /src/config /src/lib /app/
@@ -46,6 +59,7 @@ spec:
           env:
             - { name: VIDEO_DIR, value: /data/videos }
             - { name: TMPDIR, value: /data/videos/.uploads }
+            - { name: TOOLS_DIR, value: /data/videos/.tools }
             - { name: PORT, value: "4000" }
             - { name: LANG, value: C.UTF-8 }
           ports:
