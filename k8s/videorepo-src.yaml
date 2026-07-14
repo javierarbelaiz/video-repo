@@ -43,6 +43,7 @@ spec:
                 curl -fsSL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o "$TOOLS_DIR/yt-dlp" \
                   && chmod +x "$TOOLS_DIR/yt-dlp" || echo "[boot] WARN: fallo la descarga de yt-dlp"
               fi
+              chmod +x "$TOOLS_DIR"/* 2>/dev/null || true
               export PATH="$TOOLS_DIR:$PATH"
               echo "[boot] copiando fuente a /app"
               mkdir -p /app

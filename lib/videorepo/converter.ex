@@ -43,11 +43,15 @@ defmodule Videorepo.Converter do
       src = download(url, tmp)
 
       set(id, status: "convirtiendo a H.264/AAC")
-      out = Path.join(dir, safe(title) <> ".mp4")
-      transcode(src, out)
+      # transcodifica a un archivo OCULTO (.part_) y al terminar lo renombra: asi la
+      # lista nunca muestra un .mp4 a medio convertir (sin moov atom = no reproducible).
+      final = Path.join(dir, safe(title) <> ".mp4")
+      part = Path.join(dir, ".part_" <> id <> ".mp4")
+      transcode(src, part)
+      File.rename!(part, final)
 
       set(id, status: "listo")
-      Logger.info("youtube: convertido \"#{title}\" -> #{Path.basename(out)} (#{File.stat!(out).size} bytes)")
+      Logger.info("youtube: convertido \"#{title}\" -> #{Path.basename(final)} (#{File.stat!(final).size} bytes)")
     rescue
       e ->
         msg = Exception.message(e)
