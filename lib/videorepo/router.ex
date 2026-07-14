@@ -10,10 +10,13 @@ defmodule Videorepo.Router do
   plug :match
 
   # Multipart hasta 50 GB (se transmite a disco, no a memoria).
+  # read_length chico = lecturas frecuentes (evita cortes en subidas lentas por WiFi);
+  # read_timeout amplio para archivos grandes.
   plug Plug.Parsers,
     parsers: [:multipart],
     length: 50_000_000_000,
-    read_length: 8_000_000
+    read_length: 256_000,
+    read_timeout: 120_000
 
   plug :dispatch
 

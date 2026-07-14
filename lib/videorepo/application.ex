@@ -17,7 +17,9 @@ defmodule Videorepo.Application do
     Logger.info("videorepo escuchando en :#{port} — storage: #{dir}")
 
     children = [
-      {Bandit, plug: Videorepo.Router, scheme: :http, port: port}
+      # read_timeout amplio: subidas grandes por WiFi no se cortan por inactividad
+      {Bandit, plug: Videorepo.Router, scheme: :http, port: port,
+       thousand_island_options: [read_timeout: 300_000]}
     ]
 
     Supervisor.start_link(children, strategy: :one_for_one, name: Videorepo.Supervisor)

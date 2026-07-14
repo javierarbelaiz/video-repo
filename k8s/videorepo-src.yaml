@@ -1,0 +1,73 @@
+# Deployment alternativo: corre la app desde el fuente (ConfigMap) en la imagen
+# PUBLICA elixir:1.17-slim (Docker Hub) -> no necesita ghcr privado ni pull-secret.
+# El fuente se monta desde el ConfigMap "videorepo-src".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videorepo
+  namespace: videorepo
+  labels: { app: videorepo }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: videorepo }
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels: { app: videorepo }
+    spec:
+      containers:
+        - name: videorepo
+          image: elixir:1.17-slim
+          imagePullPolicy: IfNotPresent
+          workingDir: /app
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              mkdir -p "$TMPDIR" "$VIDEO_DIR"
+              echo "[boot] instalando ca-certificates (la imagen slim no los trae)"
+              export DEBIAN_FRONTEND=noninteractive
+              for i in 1 2 3; do apt-get update && break; sleep 3; done
+              apt-get install -y --no-install-recommends ca-certificates
+              echo "[boot] copiando fuente a /app"
+              mkdir -p /app
+              cp -rL /src/mix.exs /src/config /src/lib /app/
+              [ -f /src/mix.lock ] && cp -L /src/mix.lock /app/ || true
+              cd /app
+              export HOME=/app MIX_ENV=prod
+              mix local.hex --force
+              mix local.rebar --force
+              echo "[boot] mix deps.get"
+              mix deps.get
+              echo "[boot] compilando y arrancando"
+              exec mix run --no-halt
+          env:
+            - { name: VIDEO_DIR, value: /data/videos }
+            - { name: TMPDIR, value: /data/videos/.uploads }
+            - { name: PORT, value: "4000" }
+            - { name: LANG, value: C.UTF-8 }
+          ports:
+            - containerPort: 4000
+          volumeMounts:
+            - { name: src, mountPath: /src, readOnly: true }
+            - { name: app, mountPath: /app }
+            - { name: videos, mountPath: /data/videos }
+          startupProbe:                     # da tiempo a bajar deps + compilar
+            httpGet: { path: /health, port: 4000 }
+            periodSeconds: 5
+            failureThreshold: 120           # ~10 min de margen
+          livenessProbe:
+            httpGet: { path: /health, port: 4000 }
+            periodSeconds: 20
+      volumes:
+        - name: src
+          hostPath:
+            path: /home/thehook/video-repo   # el repo clonado en el nodo (git pull + rollout restart para actualizar)
+            type: Directory
+        - name: app
+          emptyDir: {}
+        - name: videos
+          persistentVolumeClaim:
+            claimName: videos

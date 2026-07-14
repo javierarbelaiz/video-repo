@@ -1,0 +1,44 @@
+# Responder mDNS en un pod (hostNetwork) que publica videorepo.local -> IP del nodo,
+# sin necesitar avahi ni sudo en el host. Imagen publica python:3.12-slim.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mdns-videorepo
+  namespace: videorepo
+  labels: { app: mdns-videorepo }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: mdns-videorepo }
+  template:
+    metadata:
+      labels: { app: mdns-videorepo }
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+        - name: mdns
+          image: python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              pip install --no-cache-dir --root-user-action=ignore zeroconf
+              cat > /mdns.py <<'PY'
+              import socket, time
+              from zeroconf import Zeroconf, ServiceInfo
+              IP = "192.168.1.199"
+              zc = Zeroconf()
+              info = ServiceInfo(
+                  "_http._tcp.local.",
+                  "videorepo._http._tcp.local.",
+                  addresses=[socket.inet_aton(IP)],
+                  port=30080,
+                  server="videorepo.local.",
+              )
+              zc.register_service(info)
+              print("mDNS: videorepo.local ->", IP, flush=True)
+              while True:
+                  time.sleep(3600)
+              PY
+              exec python /mdns.py
