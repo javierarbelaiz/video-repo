@@ -67,6 +67,11 @@ spec:
   type: NodePort
   selector: { app: videorepo }
   ports:
-    - port: 80
+    - name: http
+      port: 80
       targetPort: 4000
-      nodePort: 30080                     # http://192.168.1.199:30080
+      nodePort: 30080                     # http://192.168.1.199:30080 — lo usa la TV
+    - name: https
+      port: 443
+      targetPort: 4443
+      nodePort: 30443                     # https://192.168.1.199:30443/vr — WebXR

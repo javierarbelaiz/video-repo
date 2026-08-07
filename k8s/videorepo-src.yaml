@@ -30,7 +30,7 @@ spec:
               echo "[boot] instalando ca-certificates (la imagen slim no los trae)"
               export DEBIAN_FRONTEND=noninteractive
               for i in 1 2 3; do apt-get update && break; sleep 3; done
-              apt-get install -y --no-install-recommends ca-certificates curl xz-utils
+              apt-get install -y --no-install-recommends ca-certificates curl xz-utils openssl
               echo "[boot] herramientas (ffmpeg + yt-dlp) en el PVC (una sola vez)"
               mkdir -p "$TOOLS_DIR"
               if [ ! -x "$TOOLS_DIR/ffmpeg" ]; then
@@ -45,9 +45,19 @@ spec:
               fi
               chmod +x "$TOOLS_DIR"/* 2>/dev/null || true
               export PATH="$TOOLS_DIR:$PATH"
+              echo "[boot] certificado TLS autofirmado (WebXR exige contexto seguro)"
+              mkdir -p "$TLS_DIR"
+              if [ ! -f "$TLS_DIR/cert.pem" ] || [ ! -f "$TLS_DIR/key.pem" ]; then
+                openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+                  -keyout "$TLS_DIR/key.pem" -out "$TLS_DIR/cert.pem" \
+                  -subj "/CN=$TLS_HOST" \
+                  -addext "subjectAltName=IP:$TLS_HOST,DNS:videorepo.local" \
+                  && echo "[boot] cert generado para $TLS_HOST" \
+                  || echo "[boot] WARN: fallo la generacion del cert, arranco solo HTTP"
+              fi
               echo "[boot] copiando fuente a /app"
               mkdir -p /app
-              cp -rL /src/mix.exs /src/config /src/lib /app/
+              cp -rL /src/mix.exs /src/config /src/lib /src/priv /app/
               [ -f /src/mix.lock ] && cp -L /src/mix.lock /app/ || true
               cd /app
               export HOME=/app MIX_ENV=prod
@@ -63,8 +73,12 @@ spec:
             - { name: TOOLS_DIR, value: /data/videos/.tools }
             - { name: PORT, value: "4000" }
             - { name: LANG, value: C.UTF-8 }
+            - { name: TLS_PORT, value: "4443" }
+            - { name: TLS_DIR, value: /data/videos/.certs }
+            - { name: TLS_HOST, value: "192.168.1.199" }
           ports:
             - containerPort: 4000
+            - containerPort: 4443
           volumeMounts:
             - { name: src, mountPath: /src, readOnly: true }
             - { name: app, mountPath: /app }
