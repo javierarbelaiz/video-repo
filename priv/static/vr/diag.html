@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diagnostico 360</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,Segoe UI,Roboto,sans-serif;background:#0e1116;color:#e6edf3;font-size:20px}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px}
+  h1{font-size:24px;margin:0 0 4px}
+  .sub{color:#8b949e;font-size:16px;margin-bottom:16px}
+  video{width:100%;max-height:38vh;background:#000;border-radius:10px}
+  .row{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap}
+  button{background:#238636;color:#fff;border:1px solid #2ea043;border-radius:8px;
+    padding:14px 22px;font-size:20px;cursor:pointer}
+  button.sec{background:#21262d;border-color:#30363d;color:#e6edf3}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  td{padding:10px 12px;border-bottom:1px solid #21262d;font-variant-numeric:tabular-nums}
+  td.k{color:#8b949e;width:52%}
+  td.v{text-align:right;font-size:24px;font-weight:600}
+  .ok{color:#3fb950} .warn{color:#d29922} .bad{color:#f85149}
+  #verdict{margin-top:16px;padding:16px;border-radius:10px;background:#161b22;
+    border:1px solid #30363d;font-size:19px;line-height:1.5}
+</style>
+</head><body>
+<div class="wrap">
+  <h1>Diagnostico de reproduccion 360</h1>
+  <div class="sub">Reproduce el video <b>plano, sin WebXR</b>. Si se traba igual aca, el problema no esta en la esfera ni en la textura.</div>
+
+  <video id="v" playsinline controls preload="auto"></video>
+
+  <div class="row">
+    <button id="start">Reproducir y medir</button>
+    <button class="sec" id="reset">Reiniciar medicion</button>
+  </div>
+
+  <table>
+    <tr><td class="k">Cuadros decodificados</td><td class="v" id="total">—</td></tr>
+    <tr><td class="k">Cuadros perdidos (decoder no llego)</td><td class="v" id="dropped">—</td></tr>
+    <tr><td class="k">% perdido</td><td class="v" id="pct">—</td></tr>
+    <tr><td class="k">FPS efectivo (objetivo 60)</td><td class="v" id="fps">—</td></tr>
+    <tr><td class="k">Eventos "waiting" (red sin datos)</td><td class="v" id="waiting">—</td></tr>
+    <tr><td class="k">Buffer por delante ahora</td><td class="v" id="buf">—</td></tr>
+    <tr><td class="k">Buffer minimo visto</td><td class="v" id="minbuf">—</td></tr>
+    <tr><td class="k">Velocidad de descarga</td><td class="v" id="rate">—</td></tr>
+  </table>
+
+  <div id="verdict">Toca <b>Reproducir y medir</b> y deja correr al menos 60 segundos, preferentemente en una parte de mucho movimiento.</div>
+</div>
+
+<script>
+'use strict';
+
+var SRC = '/videos/scariest-sea-monsters_360.webm';
+var v = document.getElementById('v');
+var waitingCount = 0, minBuf = Infinity, started = 0;
+var lastTotal = 0, lastWall = 0, fpsNow = 0;
+var lastBufEnd = 0, lastBufWall = 0, rateNow = 0;
+
+v.src = SRC;
+
+function el(id) { return document.getElementById(id); }
+function cls(node, c) { node.className = 'v ' + c; }
+
+v.addEventListener('waiting', function () { waitingCount++; });
+
+function bufferedAhead() {
+  var t = v.currentTime;
+  for (var i = 0; i < v.buffered.length; i++) {
+    if (v.buffered.start(i) <= t && t <= v.buffered.end(i)) {
+      return { ahead: v.buffered.end(i) - t, end: v.buffered.end(i) };
+    }
+  }
+  return { ahead: 0, end: 0 };
+}
+
+function sample() {
+  if (!v.getVideoPlaybackQuality) {
+    el('verdict').innerHTML = 'Este navegador no expone getVideoPlaybackQuality(): no puedo medir cuadros perdidos.';
+    return;
+  }
+
+  var q = v.getVideoPlaybackQuality();
+  var now = performance.now();
+  var b = bufferedAhead();
+
+  // FPS efectivo: cuadros decodificados por segundo de reloj real
+  if (lastWall) {
+    var dt = (now - lastWall) / 1000;
+    if (dt > 0) fpsNow = (q.totalVideoFrames - lastTotal) / dt;
+  }
+  lastTotal = q.totalVideoFrames;
+  lastWall = now;
+
+  // Velocidad de descarga: cuanto avanza el final del buffer por segundo de reloj
+  if (lastBufWall && b.end > lastBufEnd) {
+    var dtb = (now - lastBufWall) / 1000;
+    if (dtb > 0) rateNow = (b.end - lastBufEnd) / dtb;   // segundos de video por segundo
+  }
+  lastBufEnd = b.end;
+  lastBufWall = now;
+
+  if (!v.paused && b.ahead < minBuf) minBuf = b.ahead;
+
+  var pct = q.totalVideoFrames ? (q.droppedVideoFrames / q.totalVideoFrames * 100) : 0;
+
+  el('total').textContent = q.totalVideoFrames;
+  el('dropped').textContent = q.droppedVideoFrames;
+  el('pct').textContent = pct.toFixed(1) + ' %';
+  el('fps').textContent = fpsNow.toFixed(0);
+  el('waiting').textContent = waitingCount;
+  el('buf').textContent = b.ahead.toFixed(1) + ' s';
+  el('minbuf').textContent = (minBuf === Infinity ? '—' : minBuf.toFixed(1) + ' s');
+  el('rate').textContent = rateNow.toFixed(2) + 'x tiempo real';
+
+  cls(el('pct'), pct > 5 ? 'bad' : pct > 1 ? 'warn' : 'ok');
+  cls(el('fps'), fpsNow < 40 ? 'bad' : fpsNow < 55 ? 'warn' : 'ok');
+  cls(el('waiting'), waitingCount > 3 ? 'bad' : waitingCount > 0 ? 'warn' : 'ok');
+  cls(el('minbuf'), minBuf < 2 ? 'bad' : minBuf < 6 ? 'warn' : 'ok');
+  cls(el('rate'), rateNow > 0 && rateNow < 1.2 ? 'bad' : rateNow < 2 ? 'warn' : 'ok');
+
+  if (performance.now() - started > 20000) verdict(pct, fpsNow, waitingCount, minBuf, rateNow);
+}
+
+function verdict(pct, fps, waits, mbuf, rate) {
+  var decodeBad = pct > 1 || fps < 55;
+  var netBad = waits > 0 || mbuf < 6 || (rate > 0 && rate < 1.5);
+  var msg;
+
+  if (decodeBad && netBad) {
+    msg = '<b class="bad">Las dos capas estan al limite.</b> Se pierden cuadros Y la red no alimenta con holgura. ' +
+          'Un reencode a menor resolucion/fps ataca las dos a la vez: baja el trabajo del decoder y el bitrate.';
+  } else if (decodeBad) {
+    msg = '<b class="bad">Cuello de botella: DECODIFICACION.</b> La red alimenta bien pero el visor no sostiene ' +
+          '4K60 AV1. Se resuelve reencodeando (menos fps, o a un codec que el hardware maneje mejor). ' +
+          'Ningun ajuste del reproductor lo arregla.';
+  } else if (netBad) {
+    msg = '<b class="bad">Cuello de botella: RED.</b> El decoder da abasto pero los datos no llegan a tiempo. ' +
+          'Se ataca bajando el bitrate, o mejorando el enlace (cable al nodo en vez de WiFi).';
+  } else {
+    msg = '<b class="ok">Plano se reproduce limpio.</b> Ni cuadros perdidos ni hambre de red. ' +
+          'Entonces el problema aparece SOLO con WebXR activo: apunta al render de la esfera o a la subida de textura, ' +
+          'no al video en si.';
+  }
+  el('verdict').innerHTML = msg + '<br><br><span style="color:#8b949e;font-size:16px">Dejalo correr en una parte de mucho movimiento; ahi es donde el bitrate pega los picos.</span>';
+}
+
+document.getElementById('start').onclick = function () {
+  started = performance.now();
+  v.play();
+};
+
+document.getElementById('reset').onclick = function () {
+  waitingCount = 0; minBuf = Infinity; lastTotal = 0; lastWall = 0;
+  lastBufEnd = 0; lastBufWall = 0; rateNow = 0; fpsNow = 0;
+  started = performance.now();
+};
+
+setInterval(sample, 1000);
+</script>
+</body></html>
