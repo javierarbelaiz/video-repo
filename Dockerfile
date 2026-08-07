@@ -18,6 +18,7 @@ COPY config config
 RUN mix deps.compile
 
 COPY lib lib
+COPY priv priv
 RUN mix compile && mix release
 
 # ---------- runtime: imagen minima, el release trae su propio ERTS ----------

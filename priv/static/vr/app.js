@@ -88,6 +88,11 @@ function load() {
 
 videoEl.addEventListener('error', function () {
   var err = videoEl.error;
+  // code 1 (MEDIA_ERR_ABORTED) es lo esperable cuando backToList() corta una
+  // carga en curso con removeAttribute('src') + load(): no es una falla real,
+  // es la consecuencia normal de navegar afuera del video. Mostrar un cartel
+  // rojo justo despues de tocar "Volver a la lista" es ruido, no informacion.
+  if (err && err.code === 1) { return; }
   var names = { 1: 'ABORTED', 2: 'NETWORK', 3: 'DECODE', 4: 'SRC_NOT_SUPPORTED' };
   show('err', 'Fallo el video: ' + (err ? (names[err.code] || err.code) : 'desconocido') +
     '. Con material 4K un fallo de decodificacion es plausible.');
@@ -202,7 +207,15 @@ function enterVR() {
       xrSession.end();
     } else {
       enterBtn.disabled = false;
-      renderer.domElement.style.display = 'none';
+      // renderer puede seguir siendo null aca: isSessionSupported() pudo
+      // rechazar antes de llegar a buildScene(), o buildScene() pudo tirar
+      // (por ejemplo si el WebGLRenderer no consigue contexto). Sin esta
+      // guarda el dereference de renderer.domElement tira un TypeError
+      // DENTRO del catch, que pisa el show('err', ...) de abajo y deja al
+      // usuario sin ningun mensaje.
+      if (renderer) {
+        renderer.domElement.style.display = 'none';
+      }
       videoEl.pause();
     }
     show('err', 'No se pudo iniciar la sesion VR: ' + e.message);
