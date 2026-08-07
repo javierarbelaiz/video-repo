@@ -82,4 +82,32 @@ defmodule Videorepo.RouterTest do
     assert conn.status == 404
     assert conn.resp_body == "no existe"
   end
+
+  test "GET / sirve la pagina de subida" do
+    conn = conn(:get, "/") |> call()
+    assert conn.status == 200
+    assert get_resp_header(conn, "content-type") == ["text/html; charset=utf-8"]
+    assert conn.resp_body =~ "Video Repo"
+  end
+
+  test "GET /vr sirve la pagina 360" do
+    conn = conn(:get, "/vr") |> call()
+    assert conn.status == 200
+    assert get_resp_header(conn, "content-type") == ["text/html; charset=utf-8"]
+    assert conn.resp_body =~ "360"
+  end
+
+  test "GET /vr/app.js lo sirve Plug.Static con su content-type" do
+    conn = conn(:get, "/vr/app.js") |> call()
+    assert conn.status == 200
+    assert hd(get_resp_header(conn, "content-type")) =~ "javascript"
+  end
+
+  test "Plug.Static no intercepta /videos", %{dir: dir} do
+    File.write!(Path.join(dir, "clip.mp4"), "0123456789")
+
+    conn = conn(:get, "/videos/clip.mp4") |> call()
+    assert conn.status == 200
+    assert get_resp_header(conn, "accept-ranges") == ["bytes"]
+  end
 end
