@@ -49,7 +49,11 @@ UNPACK="set -e
 mkdir -p $WORK
 rm -rf $WORK/lib $WORK/test $WORK/config $WORK/priv
 tar -xzf - -C $WORK
-[ -d $WORK/deps ] || cp -r /app/deps $WORK/deps"
+# deps y mix.lock ya resueltos por el arranque del pod. El repo no commitea
+# mix.lock, asi que sin esto mix vuelve a resolver contra la red en cada pod
+# nuevo (y /tmp/t se pierde en cada rollout).
+[ -d $WORK/deps ] || cp -r /app/deps $WORK/deps
+[ -f $WORK/mix.lock ] || cp /app/mix.lock $WORK/mix.lock 2>/dev/null || true"
 
 tar -czf - "${PATHS[@]}" \
   | ssh -o ConnectTimeout=10 "$NODE" \
