@@ -71,8 +71,15 @@ defmodule Videorepo.RouterTest do
     assert conn.status == 404
   end
 
-  test "GET /videos/:name no permite salir del directorio de videos" do
+  test "GET /videos/:name with encoded slashes returns 404 from video route" do
     conn = conn(:get, "/videos/..%2F..%2Fetc%2Fpasswd") |> call()
     assert conn.status == 404
+    assert conn.resp_body == "no existe"
+  end
+
+  test "GET /videos/:name with .. component returns 404 from video route" do
+    conn = conn(:get, "/videos/..") |> call()
+    assert conn.status == 404
+    assert conn.resp_body == "no existe"
   end
 end
