@@ -124,7 +124,9 @@ function buildScene() {
   renderer.xr.setReferenceSpaceType('local');
   renderer.domElement.style.display = 'none';
   document.body.appendChild(renderer.domElement);
-  renderer.setAnimationLoop(function () { renderer.render(scene, camera); });
+  // El loop de animacion arranca/para junto con la sesion XR (ver enterVR y
+  // onSessionEnd), no aca: si quedara siempre activo, el renderer seguiria
+  // dibujando cada frame con la lista 2D de fondo y el canvas oculto.
 
   // Gatillo = play/pausa. El boton del sistema del Quest cierra la sesion solo.
   var controller = renderer.xr.getController(0);
@@ -138,6 +140,7 @@ function togglePlay() {
 
 function onSessionEnd() {
   xrSession = null;
+  renderer.setAnimationLoop(null);
   renderer.domElement.style.display = 'none';
   videoEl.pause();
   enterBtn.disabled = false;
@@ -145,9 +148,16 @@ function onSessionEnd() {
 }
 
 function enterVR() {
+  // Deshabilitar de entrada, de forma sincronica con el click: si quedara
+  // adentro del .then de isSessionSupported, dos clicks rapidos disparan dos
+  // requestSession concurrentes. Todo camino de salida que no termine con una
+  // sesion activa tiene que volver a habilitarlo antes de retornar.
+  enterBtn.disabled = true;
+
   // navigator.xr solo existe en contexto seguro. Es de lejos el fallo mas
   // probable de todo esto, asi que el mensaje tiene que ser explicito.
   if (!navigator.xr) {
+    enterBtn.disabled = false;
     show('err', 'No hay WebXR en este navegador. La causa habitual es haber entrado por ' +
       '<code>http://</code>: WebXR solo funciona sobre <code>https://</code>. ' +
       'Proba con <code>https://192.168.1.199:30443/vr</code>.');
@@ -156,6 +166,7 @@ function enterVR() {
 
   navigator.xr.isSessionSupported('immersive-vr').then(function (supported) {
     if (!supported) {
+      enterBtn.disabled = false;
       show('info', 'Este dispositivo no soporta VR inmersiva. Podes ver el video plano aca abajo, ' +
         'pero para el 360 real hace falta el visor.');
       videoEl.controls = true;
@@ -163,7 +174,6 @@ function enterVR() {
     }
 
     buildScene();
-    enterBtn.disabled = true;
 
     return navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] })
       .then(function (session) {
@@ -174,9 +184,27 @@ function enterVR() {
       })
       .then(function () {
         return videoEl.play();
+      })
+      .then(function () {
+        // Recien aca la sesion esta realmente lista: pedido, setSession y
+        // play() resueltos. Arrancar el loop antes de esto dejaria cuadros
+        // renderizados sin video listo; no arrancarlo aca deja una imagen
+        // congelada en la segunda entrada.
+        renderer.setAnimationLoop(function () { renderer.render(scene, camera); });
       });
   }).catch(function (e) {
-    enterBtn.disabled = false;
+    // requestSession, setSession o videoEl.play() pueden rechazar despues de
+    // que xrSession ya quedo asignado y el canvas ya quedo visible (ver
+    // comentario mas arriba). Si hay sesion, cerrarla dispara onSessionEnd y
+    // deja boton/canvas/video/loop en el mismo estado que un cierre normal;
+    // si no llegamos a tener sesion, restauramos ese mismo estado a mano.
+    if (xrSession) {
+      xrSession.end();
+    } else {
+      enterBtn.disabled = false;
+      renderer.domElement.style.display = 'none';
+      videoEl.pause();
+    }
     show('err', 'No se pudo iniciar la sesion VR: ' + e.message);
   });
 }
