@@ -65,6 +65,7 @@ function select(v) {
 }
 
 function backToList() {
+  if (xrSession) { xrSession.end(); }
   videoEl.pause();
   videoEl.removeAttribute('src');
   videoEl.load();
@@ -93,5 +94,100 @@ videoEl.addEventListener('error', function () {
 });
 
 document.getElementById('back').onclick = backToList;
+
+// ---------- reproductor WebXR ----------
+
+var SPHERE_RADIUS = 500;
+
+var renderer = null, scene = null, camera = null, xrSession = null;
+var enterBtn = document.getElementById('enter');
+
+function buildScene() {
+  if (renderer) return;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1100);
+
+  // Esfera vista DESDE ADENTRO: escalar en -1 invierte las normales.
+  var geo = new THREE.SphereGeometry(SPHERE_RADIUS, 60, 40);
+  geo.scale(-1, 1, 1);
+
+  var texture = new THREE.VideoTexture(videoEl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  scene.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: texture })));
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  renderer.xr.setReferenceSpaceType('local');
+  renderer.domElement.style.display = 'none';
+  document.body.appendChild(renderer.domElement);
+  renderer.setAnimationLoop(function () { renderer.render(scene, camera); });
+
+  // Gatillo = play/pausa. El boton del sistema del Quest cierra la sesion solo.
+  var controller = renderer.xr.getController(0);
+  controller.addEventListener('selectstart', togglePlay);
+  scene.add(controller);
+}
+
+function togglePlay() {
+  if (videoEl.paused) { videoEl.play(); } else { videoEl.pause(); }
+}
+
+function onSessionEnd() {
+  xrSession = null;
+  renderer.domElement.style.display = 'none';
+  videoEl.pause();
+  enterBtn.disabled = false;
+  enterBtn.textContent = 'Entrar en VR';
+}
+
+function enterVR() {
+  // navigator.xr solo existe en contexto seguro. Es de lejos el fallo mas
+  // probable de todo esto, asi que el mensaje tiene que ser explicito.
+  if (!navigator.xr) {
+    show('err', 'No hay WebXR en este navegador. La causa habitual es haber entrado por ' +
+      '<code>http://</code>: WebXR solo funciona sobre <code>https://</code>. ' +
+      'Proba con <code>https://192.168.1.199:30443/vr</code>.');
+    return;
+  }
+
+  navigator.xr.isSessionSupported('immersive-vr').then(function (supported) {
+    if (!supported) {
+      show('info', 'Este dispositivo no soporta VR inmersiva. Podes ver el video plano aca abajo, ' +
+        'pero para el 360 real hace falta el visor.');
+      videoEl.controls = true;
+      return;
+    }
+
+    buildScene();
+    enterBtn.disabled = true;
+
+    return navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] })
+      .then(function (session) {
+        xrSession = session;
+        session.addEventListener('end', onSessionEnd);
+        renderer.domElement.style.display = '';
+        return renderer.xr.setSession(session);
+      })
+      .then(function () {
+        return videoEl.play();
+      });
+  }).catch(function (e) {
+    enterBtn.disabled = false;
+    show('err', 'No se pudo iniciar la sesion VR: ' + e.message);
+  });
+}
+
+enterBtn.onclick = enterVR;
+
+window.addEventListener('resize', function () {
+  if (!renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
 
 load();
