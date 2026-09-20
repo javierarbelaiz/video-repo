@@ -10,6 +10,44 @@ defmodule Videorepo.Converter do
   defp ytdlp, do: Path.join(tools_dir(), "yt-dlp")
   defp ffmpeg, do: Path.join(tools_dir(), "ffmpeg")
 
+  # Dos familias de fallo que se curan distinto, y confundirlas cuesta caro.
+  #
+  # STALE: yt-dlp quedo viejo. YouTube rota sus defensas cada pocas semanas y un
+  # binario congelado negocia formatos que el CDN despues rechaza (el 403). Se
+  # cura actualizando el binario.
+  @stale_markers [
+    "HTTP Error 403",
+    "Requested format is not available",
+    "nsig extraction failed",
+    "Failed to extract any player response"
+  ]
+
+  # BLOQUEO: el binario esta perfecto, es YouTube negandose a servir a ESTE
+  # cliente desde esta IP. Actualizar no cambia nada (medido el 2026-09-20: el
+  # muro seguia ahi con yt-dlp recien bajado); lo que sirve es pedir el video
+  # por otro player client.
+  @blocked_markers [
+    "Sign in to confirm",
+    "PO Token",
+    "HTTP Error 429",
+    "The page needs to be reloaded"
+  ]
+
+  # Player clients en orden de preferencia. El default resuelve la mayoria de
+  # los videos; los otros son la salida cuando YouTube levanta el muro contra el
+  # cliente web, que exige un PO Token que no tenemos (conseguirlo implicaria
+  # meter cookies de una cuenta real en el pod).
+  #
+  # Orden medido contra el muro el 2026-09-20 (video Qoc1zSZoTog):
+  # web_embedded devolvio 399+251 (1080p), mweb solo el formato 18 (360p), y
+  # tv/tv_simply/visionos/android_vr/ios no pasaron. Por eso mweb va ultimo: es
+  # el bote salvavidas, no una opcion buena.
+  @clients [
+    {"default", []},
+    {"web_embedded", ["--extractor-args", "youtube:player_client=web_embedded"]},
+    {"mweb", ["--extractor-args", "youtube:player_client=mweb"]}
+  ]
+
   @doc "Arranca un trabajo de conversion; devuelve el id."
   def start(url, video_dir) do
     id = :crypto.strong_rand_bytes(6) |> Base.url_encode64(padding: false)
@@ -62,24 +100,30 @@ defmodule Videorepo.Converter do
     end
   end
 
+  # Recorre los mismos clientes que la descarga: si el default esta bloqueado el
+  # titulo sale vacio y el job se mostraba como "youtube_1789911995" aunque la
+  # descarga despues funcionara por otra puerta. Best-effort: el nombre generico
+  # es un final aceptable, no vale abortar por el.
   defp get_title(url) do
-    case System.cmd(ytdlp(), ["--no-playlist", "--no-warnings", "--print", "%(title)s", url],
-           stderr_to_stdout: true) do
-      {out, 0} -> out |> String.split("\n", trim: true) |> List.first() |> to_string() |> String.trim()
-      _ -> "youtube_" <> Integer.to_string(System.system_time(:second))
-    end
+    Enum.find_value(@clients, fallback_title(), fn {_name, args} ->
+      case System.cmd(
+             ytdlp(),
+             ["--no-playlist", "--no-warnings", "--print", "%(title)s"] ++ args ++ [url],
+             stderr_to_stdout: true
+           ) do
+        {out, 0} ->
+          out |> String.split("\n", trim: true) |> List.first() |> to_string() |> String.trim() |> presence()
+
+        _ ->
+          nil
+      end
+    end)
   end
 
-  # Errores que NO son del video ni de la red: son yt-dlp quedandose viejo.
-  # YouTube rota sus defensas cada pocas semanas y un binario congelado empieza
-  # a negociar formatos que el CDN despues rechaza (el 403 clasico).
-  @stale_markers [
-    "HTTP Error 403",
-    "Requested format is not available",
-    "nsig extraction failed",
-    "Sign in to confirm",
-    "Failed to extract any player response"
-  ]
+  defp presence(""), do: nil
+  defp presence(title), do: title
+
+  defp fallback_title, do: "youtube_" <> Integer.to_string(System.system_time(:second))
 
   @doc """
   Distingue "el binario quedo viejo" de "este video no se puede bajar".
@@ -90,39 +134,67 @@ defmodule Videorepo.Converter do
   def stale_failure?(log), do: Enum.any?(@stale_markers, &String.contains?(log, &1))
 
   @doc """
+  Reconoce que YouTube nos cerro la puerta a este player client.
+
+  Separado de `stale_failure?/1` a proposito: el sintoma se parece (la descarga
+  no arranca) pero la cura es la opuesta — aca no hay nada que actualizar, hay
+  que golpear otra puerta.
+  """
+  def blocked_failure?(log), do: Enum.any?(@blocked_markers, &String.contains?(log, &1))
+
+  @doc """
   Descarga el video en `tmp` y devuelve la ruta del archivo bajado.
 
-  Publica para poder probar el reintento sin red: el binario de yt-dlp vive en
-  el PVC y sobrevive a todos los reinicios del pod, asi que si nadie lo
-  actualiza se queda congelado para siempre y cada descarga termina en 403. La
-  unica cura es actualizarlo, y eso hay que poder verificarlo de punta a punta.
+  Publica para poder probar los reintentos sin red. Son dos, y hay que poder
+  verificarlos de punta a punta porque los dos nacieron de fallas reales: el
+  binario congelado en el PVC (403) y el muro anti-bot de YouTube.
   """
-  def download(url, tmp) do
-    case run_ytdlp(url, tmp) do
+  def download(url, tmp), do: attempt(url, tmp, @clients, false, "sin intentos")
+
+  defp attempt(_url, _tmp, [], _updated?, last) do
+    raise "ningun player client (#{Enum.map_join(@clients, ", ", &elem(&1, 0))}) pudo bajar el video. " <>
+            "Ultimo error: #{last}. Suele pasar cuando la IP quedo marcada; si persiste, la unica " <>
+            "salida es pasarle cookies de una sesion de YouTube a yt-dlp (--cookies)."
+  end
+
+  defp attempt(url, tmp, [{name, args} | resto], updated?, last) do
+    case run_ytdlp(url, tmp, args) do
       {_log, 0} ->
+        if name != "default", do: Logger.info("descarga resuelta con el player client #{name}")
         downloaded!(tmp)
 
       {log, _} ->
-        unless stale_failure?(log), do: raise("yt-dlp fallo: " <> tail(log))
+        cond do
+          stale_failure?(log) and not updated? ->
+            Logger.warning("yt-dlp parece viejo (#{tail(log)}) — actualizo y reintento")
+            update_ytdlp()
+            attempt(url, tmp, [{name, args} | resto], true, tail(log))
 
-        Logger.warning("yt-dlp parece viejo (#{tail(log)}) — actualizo y reintento")
-        update_ytdlp()
+          blocked_failure?(log) or stale_failure?(log) ->
+            Logger.warning("player client #{name} rechazado (#{tail(log)}) — pruebo el siguiente")
+            pause()
+            attempt(url, tmp, resto, updated?, tail(log))
 
-        case run_ytdlp(url, tmp) do
-          {_log, 0} -> downloaded!(tmp)
-          {log2, _} -> raise("la descarga fallo aun con yt-dlp actualizado: " <> tail(log2))
+          true ->
+            # Video privado, borrado, con geobloqueo: cambiar de cliente no lo
+            # arregla y reintentar solo escondería el motivo real.
+            raise("yt-dlp fallo: " <> tail(log))
         end
     end
   end
 
-  defp run_ytdlp(url, tmp) do
+  defp run_ytdlp(url, tmp, extra) do
     System.cmd(
       ytdlp(),
       ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b", "--no-playlist",
-       "--merge-output-format", "mkv", "-o", Path.join(tmp, "src.%(ext)s"), url],
+       "--merge-output-format", "mkv", "-o", Path.join(tmp, "src.%(ext)s")] ++ extra ++ [url],
       stderr_to_stdout: true
     )
   end
+
+  # Probar clientes en rafaga se gana un 429 de YouTube (visto al medir), que
+  # despues parece un bloqueo y contamina el diagnostico del intento siguiente.
+  defp pause, do: Process.sleep(Application.get_env(:videorepo, :retry_pause_ms, 2_000))
 
   # Best-effort: si la actualizacion falla igual reintentamos, porque el 403
   # tambien puede haber sido pasajero. Abortar aca solo perderia ese intento.
