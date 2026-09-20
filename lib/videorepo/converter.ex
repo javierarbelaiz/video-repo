@@ -70,19 +70,70 @@ defmodule Videorepo.Converter do
     end
   end
 
-  defp download(url, tmp) do
-    tpl = Path.join(tmp, "src.%(ext)s")
+  # Errores que NO son del video ni de la red: son yt-dlp quedandose viejo.
+  # YouTube rota sus defensas cada pocas semanas y un binario congelado empieza
+  # a negociar formatos que el CDN despues rechaza (el 403 clasico).
+  @stale_markers [
+    "HTTP Error 403",
+    "Requested format is not available",
+    "nsig extraction failed",
+    "Sign in to confirm",
+    "Failed to extract any player response"
+  ]
 
-    {log, code} =
-      System.cmd(
-        ytdlp(),
-        ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b", "--no-playlist",
-         "--merge-output-format", "mkv", "-o", tpl, url],
-        stderr_to_stdout: true
-      )
+  @doc """
+  Distingue "el binario quedo viejo" de "este video no se puede bajar".
 
-    if code != 0, do: raise("yt-dlp fallo: " <> tail(log))
+  Solo el primer caso se cura actualizando yt-dlp. Reintentar un video privado
+  o un corte de red seria puro ruido, y peor: escondería la causa real.
+  """
+  def stale_failure?(log), do: Enum.any?(@stale_markers, &String.contains?(log, &1))
 
+  @doc """
+  Descarga el video en `tmp` y devuelve la ruta del archivo bajado.
+
+  Publica para poder probar el reintento sin red: el binario de yt-dlp vive en
+  el PVC y sobrevive a todos los reinicios del pod, asi que si nadie lo
+  actualiza se queda congelado para siempre y cada descarga termina en 403. La
+  unica cura es actualizarlo, y eso hay que poder verificarlo de punta a punta.
+  """
+  def download(url, tmp) do
+    case run_ytdlp(url, tmp) do
+      {_log, 0} ->
+        downloaded!(tmp)
+
+      {log, _} ->
+        unless stale_failure?(log), do: raise("yt-dlp fallo: " <> tail(log))
+
+        Logger.warning("yt-dlp parece viejo (#{tail(log)}) — actualizo y reintento")
+        update_ytdlp()
+
+        case run_ytdlp(url, tmp) do
+          {_log, 0} -> downloaded!(tmp)
+          {log2, _} -> raise("la descarga fallo aun con yt-dlp actualizado: " <> tail(log2))
+        end
+    end
+  end
+
+  defp run_ytdlp(url, tmp) do
+    System.cmd(
+      ytdlp(),
+      ["-f", "bv*[height<=1080]+ba/b[height<=1080]/b", "--no-playlist",
+       "--merge-output-format", "mkv", "-o", Path.join(tmp, "src.%(ext)s"), url],
+      stderr_to_stdout: true
+    )
+  end
+
+  # Best-effort: si la actualizacion falla igual reintentamos, porque el 403
+  # tambien puede haber sido pasajero. Abortar aca solo perderia ese intento.
+  defp update_ytdlp do
+    case System.cmd(ytdlp(), ["--update"], stderr_to_stdout: true) do
+      {out, 0} -> Logger.info("yt-dlp actualizado: #{tail(out)}")
+      {out, _} -> Logger.warning("no se pudo actualizar yt-dlp: #{tail(out)}")
+    end
+  end
+
+  defp downloaded!(tmp) do
     tmp
     |> File.ls!()
     |> Enum.map(&Path.join(tmp, &1))
