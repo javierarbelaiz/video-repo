@@ -1,0 +1,79 @@
+# go2rtc: cámara de la entrada en vivo por WebRTC (~0,3 s de atraso) en /camara de VideoRepo.
+# Toma el canal ch1 de la cámara (H.264 640x360) y lo reparte sin recodificar: casi no usa CPU.
+#
+# Sin IPs ni credenciales en el repo: la config usa variables que go2rtc expande al arrancar.
+#   CAM_USER, CAM_PASS, CAM_HOST  -> Secret camara-rtsp (CAM_PASS ya codificada para URL)
+#   NODE_IP                       -> Secret videorepo-red (candidato WebRTC)
+# hostNetwork en mykaly: WebRTC necesita que el navegador llegue directo al puerto 8555 del nodo.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: go2rtc-config
+  namespace: videorepo
+data:
+  go2rtc.yaml: |
+    log:
+      level: info
+    api:
+      listen: ":1984"
+      # Solo el reproductor: quedan afuera las rutas que muestran o editan la config y las fuentes.
+      allow_paths:
+        - /stream.html
+        - /video-stream.js
+        - /video-rtc.js
+        - /api/ws
+        - /api/webrtc
+        - /api/frame.jpeg
+    rtsp:
+      listen: ""
+    webrtc:
+      listen: ":8555"
+      candidates:
+        - ${NODE_IP}:8555
+    streams:
+      entrada: rtsp://${CAM_USER}:${CAM_PASS}@${CAM_HOST}/live/ch1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go2rtc
+  namespace: videorepo
+  labels: { app: go2rtc }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate                       # hostNetwork: dos pods a la vez chocarían en los puertos
+  selector:
+    matchLabels: { app: go2rtc }
+  template:
+    metadata:
+      labels: { app: go2rtc }
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: mykaly   # el nodo de NODE_IP, el que conoce la TV
+      containers:
+        - name: go2rtc
+          image: alexxit/go2rtc:1.9.15@sha256:e098de5c2f8040dc3d4784ed2d5cfdac3b0979f9349afe587ef6a670a14b9f4d
+          args: ["-config", "/config/go2rtc.yaml"]
+          envFrom:
+            - secretRef: { name: camara-rtsp }
+          env:
+            - name: NODE_IP
+              valueFrom: { secretKeyRef: { name: videorepo-red, key: NODE_IP } }
+          resources:
+            requests: { cpu: 20m, memory: 32Mi }
+            limits: { memory: 256Mi }
+          readinessProbe:
+            httpGet: { path: /stream.html, port: 1984 }
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: { port: 1984 }
+            periodSeconds: 20
+          volumeMounts:
+            - { name: config, mountPath: /config, readOnly: true }
+      volumes:
+        - name: config
+          configMap: { name: go2rtc-config }

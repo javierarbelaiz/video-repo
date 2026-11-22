@@ -1,2 +1,7 @@
 *.sh text eol=lf
 *.py text eol=lf
+*.ex text eol=lf
+*.exs text eol=lf
+*.yaml text eol=lf
+*.html text eol=lf
+*.js text eol=lf

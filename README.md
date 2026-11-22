@@ -47,6 +47,11 @@ El camino normal es **push a `main`**:
   (`CAMERA_URL`) viven en el Secret `videorepo-red`: `deploy/red.ps1` lo carga y guarda la copia
   cifrada con SOPS en `deploy/secretos/`; `deploy/red.ps1 aplicar` lo restaura. Ver `.env.example`.
 - **Imagen privada:** el cluster la baja con el Secret `ghcr-pull` del namespace.
+- **Cámara en vivo:** `go2rtc` (k8s/go2rtc.yaml, hostNetwork en mykaly, puertos 1984 y 8555) toma el canal
+  H.264 de la cámara y lo sirve por WebRTC (~0,3 s) a `/camara`. Usuario, clave y host de la cámara viven en el
+  Secret `camara-rtsp` (copia SOPS en `deploy/secretos/`); la API solo expone el reproductor (`allow_paths`).
+- **Clips por movimiento:** el grabador del box los escribe en MPEG-4 Part 2; `camara-sync` los convierte a
+  H.264 (`+faststart`) antes de subirlos, para que se vean en el navegador y la TV.
 - **Datos:** el Namespace y el PVC `videos` llevan `Prune=false,Delete=false`: Argo nunca los borra.
 - Al arrancar, el contenedor (`rel/boot.sh`) deja ffmpeg/yt-dlp/deno en el volumen (yt-dlp se
   actualiza en cada arranque) y genera el certificado HTTPS si falta.

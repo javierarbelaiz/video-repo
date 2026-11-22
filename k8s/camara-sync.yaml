@@ -33,10 +33,11 @@ spec:
                   valueFrom: { secretKeyRef: { name: videorepo-red, key: CAMERA_URL } }
                 - { name: REPO_URL, value: "http://videorepo.videorepo.svc.cluster.local" }
                 - { name: FFPROBE, value: /data/videos/.tools/ffprobe }
+                - { name: FFMPEG, value: /data/videos/.tools/ffmpeg }
                 - { name: TMPDIR, value: /tmp }
               resources:
                 requests: { cpu: 20m, memory: 48Mi }
-                limits: { memory: 256Mi }
+                limits: { memory: 512Mi }
               volumeMounts:
                 - { name: videos, mountPath: /data/videos, readOnly: true }
           volumes:

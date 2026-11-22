@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: camara-rtsp
+    namespace: videorepo
+type: Opaque
+stringData:
+    CAM_USER: ENC[AES256_GCM,data:jO3VgKeP8A==,iv:Bi+sCnpX4IYCVzBkgcByG+II/eo+SaEManUT8GuQtBU=,tag:VmBBS5b3ma63wkQ3qb2uaw==,type:str]
+    CAM_PASS: ENC[AES256_GCM,data:cgmYdUKgHvGtg9FY,iv:+KluvF5Zf9k5vgryzmwoTQzNqwsEIPKGG/VqZEeTeOU=,tag:Nu0nUE8k+kQIh4cMvWZ6Qw==,type:str]
+    CAM_HOST: ENC[AES256_GCM,data:qlnkI2zyzgKjTD2SrjfxrmgA,iv:WeOdrNxvMCZ2YFAfJupg1vGJeAvwwSXn5ASpbYO6tAQ=,tag:xhssrOCDWrS/d1d2YwIbmA==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA2NmN0Sk0rc0NLcmVPQ0pT
+            ZjQvVERwaDVTRWwwTUgwNTdnWGU2Vzg4R24wCjhML2tjZDIrR1N2V08zNzB6QlRl
+            b0d2WnpyUXYwTW5YbWtTZEw2T0xzWWMKLS0tIE9aR3FHb3ZWWGoxMHNPWTN1dEhr
+            VmFmSmdsVzJUR1ZiVG9uWGpNZlJOT2sKvtcXSvl8HJRk4oqtawkECuBYy573xRNa
+            VptA4VCS6DEvRPu2UijBpn2fT4JiMwVozMnklwgcDbd8lKbXFghhPA==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age138ph6qsw2genyv3dhkvh2jwaqkw9436mmls3607mu45mpqpw5ums6j0m8a
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-22T05:51:19Z"
+    mac: ENC[AES256_GCM,data:LvbYWoOuenPWXPBHYUybuAFL6hI3+BhCAU+PcF24kYtV88dMVEimwlZoUFli9yWxUOih6TvumxPSBTcre20ue06Cqi8ks1YzCYKzIGAfOB5ptBSv+ZLlPzNKkgro4YzhAmsaaISD2MNwY8BVL/EYqLihCU62SSAtiFwGSBdiCYw=,iv:7Pnom4HXq2yYs9CaQvwA/hKeOyYUNbL347NsDgG84Lg=,tag:hVOoh22SNNkc5KMARa+tCQ==,type:str]
+    version: 3.13.3

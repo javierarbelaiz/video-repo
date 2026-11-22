@@ -1,14 +1,27 @@
 <!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cámara · VideoRepo</title>
-<style>body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}a{color:#8ac6ff}img,video{display:block;width:100%;max-width:640px;background:#161b22}li{margin:.6rem 0}</style>
-<a href="/">← VideoRepo</a><h1>Cámara</h1><img id="live" alt="Imagen actual de la cámara"><p id="state" role="status"></p>
+<style>body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}a,button.link{color:#8ac6ff}img,video,iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;background:#161b22}li{margin:.6rem 0}button.link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline}</style>
+<a href="/">← VideoRepo</a><h1>Cámara</h1>
+<!-- En vivo por WebRTC (~0,3 s) con go2rtc en el mismo host; si WebRTC no conecta, el reproductor cae solo a MSE. -->
+<iframe id="live" title="Cámara de la entrada en vivo" allow="autoplay; fullscreen" allowfullscreen></iframe>
+<img id="photo" alt="Imagen actual de la cámara" hidden>
+<p id="state" role="status">En vivo. <button class="link" id="toggle" type="button">Ver foto en vez de video</button></p>
 <h2>Grabaciones por movimiento</h2><ul id="clips"></ul>
 <script>
-const live=document.querySelector('#live'), state=document.querySelector('#state'), clips=document.querySelector('#clips');
-function refresh(){if(!document.hidden)live.src='/camara/imagen?t='+Date.now()}
-live.onload=()=>{state.textContent='Actualizada a las '+new Date().toLocaleTimeString();setTimeout(refresh,1000)};
-live.onerror=()=>{state.textContent='Cámara sin señal. Reintentando…';setTimeout(refresh,5000)};
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});refresh();
+const live=document.querySelector('#live'), photo=document.querySelector('#photo'), state=document.querySelector('#state'), toggle=document.querySelector('#toggle'), clips=document.querySelector('#clips');
+live.src='http://'+location.hostname+':1984/stream.html?src=entrada&mode=webrtc,mse';
+let photoMode=false, timer=null;
+function refresh(){if(photoMode&&!document.hidden)photo.src='/camara/imagen?t='+Date.now()}
+photo.onload=()=>{if(!photoMode)return;state.firstChild.textContent='Foto de las '+new Date().toLocaleTimeString()+'. ';timer=setTimeout(refresh,1000)};
+photo.onerror=()=>{if(!photoMode)return;state.firstChild.textContent='Cámara sin señal. Reintentando… ';timer=setTimeout(refresh,5000)};
+toggle.onclick=()=>{
+  photoMode=!photoMode;clearTimeout(timer);
+  live.hidden=photoMode;photo.hidden=!photoMode;
+  toggle.textContent=photoMode?'Volver al video en vivo':'Ver foto en vez de video';
+  state.firstChild.textContent=photoMode?'Cargando foto… ':'En vivo. ';
+  if(photoMode)refresh();
+};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
 async function list(){try{
   const r=await fetch('/api/videos',{cache:'no-store'});if(!r.ok)throw Error();
   const files=(await r.json()).filter(v=>v.name.startsWith('CamNet_record_')).sort((a,b)=>b.name.localeCompare(a.name));

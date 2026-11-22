@@ -109,4 +109,45 @@ defmodule Videorepo.DeployTest do
       refute File.exists?(Path.join(@root, ".github/workflows/docker.yml"))
     end
   end
+  describe "go2rtc (cámara en vivo por WebRTC)" do
+    setup do: {:ok, cfg: read("k8s/go2rtc.yaml")}
+
+    test "la imagen está fijada por versión y digest" do
+      app = doc("Deployment", "go2rtc")
+      assert app, "falta el Deployment go2rtc"
+      assert app =~ ~r/image: alexxit\/go2rtc:\d+\.\d+\.\d+@sha256:[0-9a-f]{64}$/m
+    end
+
+    test "las credenciales y direcciones de la cámara salen de Secrets", %{cfg: cfg} do
+      assert cfg =~ "camara-rtsp"
+      assert cfg =~ "videorepo-red"
+      assert cfg =~ "${CAM_USER}"
+      assert cfg =~ "${CAM_PASS}"
+      assert cfg =~ "${CAM_HOST}"
+      refute cfg =~ ~r/rtsp:\/\/[^$\s]+:[^$\s]+@/, "una URL RTSP con usuario y clave escritos"
+    end
+
+    test "la API solo expone el reproductor, no la configuración", %{cfg: cfg} do
+      assert cfg =~ "allow_paths"
+      refute cfg =~ "/api/config"
+      assert cfg =~ "/api/webrtc"
+    end
+
+    test "no reexpone la cámara por RTSP en la red", %{cfg: cfg} do
+      assert cfg =~ ~r/rtsp:\s*\n\s+listen: ""/
+    end
+  end
+
+  test "la página de la cámara usa WebRTC con go2rtc en el mismo host" do
+    html = read("priv/static/camera.html")
+    assert html =~ "location.hostname"
+    assert html =~ ":1984/stream.html?src=entrada"
+    assert html =~ "webrtc"
+  end
+
+  test "la sincronización convierte los clips a H.264 antes de subirlos" do
+    py = read("scripts/sync_camera.py")
+    assert py =~ "libx264"
+    assert py =~ "+faststart"
+  end
 end

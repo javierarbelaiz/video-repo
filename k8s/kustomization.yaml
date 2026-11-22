@@ -6,6 +6,7 @@ namespace: videorepo
 resources:
   - app.yaml
   - camara-sync.yaml
+  - go2rtc.yaml
 images:
   - name: ghcr.io/javierarbelaiz/videorepo
     newTag: sha-9f3a9f0

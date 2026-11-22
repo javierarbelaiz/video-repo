@@ -13,6 +13,7 @@ from shutil import copyfileobj
 CAM = os.environ.get("CAMERA_URL", "").rstrip("/")
 REPO = os.environ.get("REPO_URL", "http://videorepo.videorepo.svc.cluster.local").rstrip("/")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
+FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 
 
 def read_json(url):
@@ -40,7 +41,18 @@ def sync():
                 "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(video)], capture_output=True)
             if result.returncode or not result.stdout.strip():
                 continue
-            subprocess.run(["curl", "-fsS", "--max-time", "600", "-F", "file=@" + str(video),
+            # El grabador escribe MPEG-4 Part 2 (OpenCV no trae H.264), que ni el navegador ni la TV
+            # reproducen: se convierte a H.264 con el moov al principio para que arranque sin bajarlo entero.
+            h264 = Path(temp) / ("h264_" + dest)
+            converted = subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(video), "-an",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "26", "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart", str(h264)], capture_output=True)
+            if converted.returncode:
+                print("no se pudo convertir", name, converted.stderr.decode(errors="replace")[-300:])
+                continue
+            final = Path(temp) / dest
+            h264.replace(final)
+            subprocess.run(["curl", "-fsS", "--max-time", "600", "-F", "file=@" + str(final),
                             REPO + "/upload"], check=True)
 
 
