@@ -54,6 +54,11 @@ El camino normal es **push a `main`**:
   duración) y `/camara/ptz/stop`; VideoRepo valida y reenvía al grabador del box (`CAMERA_URL`), que maneja la
   cámara por ONVIF con sus credenciales. Cada movimiento frena solo (tope 2 s). La cámara no informa posición
   ni presets: los movimientos son relativos.
+- **Cámara en el celular (app instalable):** abrir `https://<nodo>.<tailnet>.ts.net:8444/camara` con Tailscale
+  y en Chrome "Instalar app" (manifest + ícono). Por HTTPS el reproductor va por `/go2rtc` del mismo origen, en
+  modo MSE (anda en casa y afuera); por HTTP en la LAN sigue WebRTC directo a `:1984`. Esa ruta es config del
+  nodo, fuera de Argo; para recrearla en MyKaly (operador `thehook`, sin sudo):
+  `tailscale serve --bg --https=8444 --set-path=/go2rtc http://127.0.0.1:1984`
 - **Clips por movimiento:** el grabador del box los escribe en MPEG-4 Part 2; `camara-sync` los convierte a
   H.264 (`+faststart`) antes de subirlos, para que se vean en el navegador y la TV.
 - **Datos:** el Namespace y el PVC `videos` llevan `Prune=false,Delete=false`: Argo nunca los borra.
