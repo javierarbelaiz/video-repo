@@ -131,6 +131,12 @@ defmodule Videorepo.DeployTest do
       assert cfg =~ "allow_paths"
       refute cfg =~ "/api/config"
       assert cfg =~ "/api/webrtc"
+      # Sin "/" go2rtc no sirve stream.html (probado con 1.9.15): el reproductor queda en 404.
+      assert cfg =~ ~r/allow_paths:\s*
+\s+- \/
+/
+      refute cfg =~ "/api/streams
+"
     end
 
     test "usa el comando de la imagen (tini + go2rtc) y la config en /config/go2rtc.yaml" do

@@ -17,7 +17,10 @@ data:
     api:
       listen: ":1984"
       # Solo el reproductor: quedan afuera las rutas que muestran o editan la config y las fuentes.
+      # "/" habilita los archivos estáticos del reproductor (sin ella, stream.html da 404); las rutas de la
+      # API que no están en la lista siguen bloqueadas.
       allow_paths:
+        - /
         - /stream.html
         - /video-stream.js
         - /video-rtc.js
