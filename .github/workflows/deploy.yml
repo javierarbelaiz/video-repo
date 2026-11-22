@@ -38,7 +38,14 @@ jobs:
           otp-version: '27'
 
       - name: Tests
+        # La app crea sus carpetas al arrancar; en el runner no se puede escribir en /data.
+        env:
+          VIDEO_DIR: ${{ runner.temp }}/videos
+          TMPDIR: ${{ runner.temp }}/uploads
+          TLS_DIR: ${{ runner.temp }}/certs
+          TOOLS_DIR: ${{ runner.temp }}/tools
         run: |
+          mkdir -p "$VIDEO_DIR" "$TMPDIR" "$TLS_DIR" "$TOOLS_DIR"
           mix local.hex --force && mix local.rebar --force
           mix deps.get
           mix test

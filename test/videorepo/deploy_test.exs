@@ -79,6 +79,12 @@ defmodule Videorepo.DeployTest do
       assert tests < push
     end
 
+    test "los tests de CI usan carpetas del runner, no /data", %{wf: wf} do
+      for var <- ~w(VIDEO_DIR TMPDIR TLS_DIR TOOLS_DIR) do
+        assert wf =~ ~r/#{var}: \$\{\{ runner\.temp \}\}/, "falta #{var} en el paso de tests"
+      end
+    end
+
     test "fija las acciones por SHA", %{wf: wf} do
       uses = Regex.scan(~r/^\s*(?:- )?uses: (\S+)/m, wf, capture: :all_but_first) |> List.flatten()
       assert length(uses) >= 4
