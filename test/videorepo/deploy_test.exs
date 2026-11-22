@@ -62,6 +62,8 @@ defmodule Videorepo.DeployTest do
     assert job =~ "concurrencyPolicy: Forbid"
     assert job =~ "videorepo-red"
     assert job =~ "claimName: videos"
+    # Un deploy reinicia la app; sin reintentos el Job falla y Argo marca Degraded.
+    assert job =~ "backoffLimit: 2"
   end
 
   test "el mDNS no se declara acá: es de la Application mdns-videorepo" do

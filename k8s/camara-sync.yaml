@@ -14,7 +14,9 @@ spec:
   failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
-      backoffLimit: 0
+      # Reintenta: si corre justo cuando el pod de la app se reinicia (deploy, Recreate) la conexión se rechaza
+      # unos segundos, y un Job fallido deja la Application en Degraded hasta la próxima corrida.
+      backoffLimit: 2
       activeDeadlineSeconds: 900
       ttlSecondsAfterFinished: 3600
       template:
