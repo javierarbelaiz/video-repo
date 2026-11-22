@@ -64,6 +64,11 @@ defmodule Videorepo.DeployTest do
     assert job =~ "claimName: videos"
   end
 
+  test "el mDNS no se declara acá: es de la Application mdns-videorepo" do
+    refute doc("Deployment", "mdns-videorepo")
+    refute File.exists?(Path.join(@root, "k8s/mdns.yaml"))
+  end
+
   test "kustomize fija la etiqueta de la imagen en una sola línea" do
     k = read("k8s/kustomization.yaml")
     assert k =~ ~r/^namespace: videorepo$/m

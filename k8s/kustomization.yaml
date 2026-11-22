@@ -5,7 +5,6 @@ kind: Kustomization
 namespace: videorepo
 resources:
   - app.yaml
-  - mdns.yaml
   - camara-sync.yaml
 images:
   - name: ghcr.io/javierarbelaiz/videorepo

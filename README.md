@@ -38,8 +38,9 @@ El camino normal es **push a `main`**:
 1. `.github/workflows/deploy.yml` corre `mix test`, construye la imagen y la publica en ghcr (privada)
    como `ghcr.io/javierarbelaiz/videorepo:sha-<7>`.
 2. La misma Action actualiza `newTag` en `k8s/kustomization.yaml` con un commit `[skip ci]`.
-3. Argo CD (Application `videorepo` en `Devs/homelab-argocd`) sincroniza `k8s/`: la app, el mDNS
-   (`videorepo.local`) y el CronJob `camara-sync`, que trae los clips del grabador de la cámara.
+3. Argo CD (Application `videorepo` en `Devs/homelab-argocd`) sincroniza `k8s/`: la app
+   y el CronJob `camara-sync`, que trae los clips del grabador de la cámara. El mDNS
+   (`videorepo.local`) vive en su propio repo y Application, `mdns-videorepo`.
 
 - **Volver atrás:** poner en `k8s/kustomization.yaml` un `sha-<7>` ya publicado y hacer push.
 - **IPs de la casa:** no van en el repo. La IP del nodo (`NODE_IP`) y el grabador de la cámara
