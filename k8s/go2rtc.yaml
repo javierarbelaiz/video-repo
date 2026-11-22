@@ -30,7 +30,8 @@ data:
     rtsp:
       listen: ""
     webrtc:
-      listen: ":8555"
+      # Atado a la IP de la LAN: con ":8555" go2rtc no abría UDP en wlan1 y el navegador caía a MSE.
+      listen: "${NODE_IP}:8555"
       candidates:
         - ${NODE_IP}:8555
     streams:

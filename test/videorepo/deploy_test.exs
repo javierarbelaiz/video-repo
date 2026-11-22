@@ -145,6 +145,11 @@ defmodule Videorepo.DeployTest do
       assert app =~ "mountPath: /config"
     end
 
+    test "WebRTC escucha y se anuncia en la IP del nodo", %{cfg: cfg} do
+      assert cfg =~ ~s(listen: "${NODE_IP}:8555")
+      assert cfg =~ "- ${NODE_IP}:8555"
+    end
+
     test "no reexpone la cámara por RTSP en la red", %{cfg: cfg} do
       assert cfg =~ ~r/rtsp:\s*\n\s+listen: ""/
     end
@@ -155,6 +160,8 @@ defmodule Videorepo.DeployTest do
     assert html =~ "location.hostname"
     assert html =~ ":1984/stream.html?src=entrada"
     assert html =~ "webrtc"
+    # img{display:block} le ganaba al atributo hidden: la foto oculta se veía como imagen rota.
+    assert html =~ "[hidden]{display:none!important}"
   end
 
   test "la sincronización convierte los clips a H.264 antes de subirlos" do
