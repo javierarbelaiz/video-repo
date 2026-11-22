@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from urllib.request import urlopen
 from shutil import copyfileobj
@@ -19,6 +20,21 @@ FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 def read_json(url):
     with urlopen(url, timeout=10) as response:
         return json.load(response)
+
+
+def wait_ready(url, timeout=180, every=10):
+    """Espera a que VideoRepo responda: tras un deploy tarda ~1,5 min en volver (baja yt-dlp al arrancar)."""
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            with urlopen(url, timeout=5) as response:
+                if response.status == 200:
+                    return True
+        except OSError:
+            pass
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(every)
 
 
 def sync():
@@ -59,4 +75,8 @@ def sync():
 if __name__ == "__main__":
     if not CAM:
         raise SystemExit("falta CAMERA_URL (Secret videorepo-red)")
+    if not wait_ready(REPO + "/health"):
+        # Sin la app no hay a dónde subir: no es un error, la próxima corrida es en 5 minutos.
+        print("VideoRepo no responde; se saltea esta corrida")
+        raise SystemExit(0)
     sync()

@@ -180,4 +180,11 @@ defmodule Videorepo.DeployTest do
     assert py =~ "libx264"
     assert py =~ "+faststart"
   end
+
+  test "la sincronización espera a que la app esté lista y si no, saltea la corrida sin fallar" do
+    py = read("scripts/sync_camera.py")
+    assert py =~ "/health"
+    assert py =~ "def wait_ready"
+    assert py =~ "se saltea esta corrida"
+  end
 end
