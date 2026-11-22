@@ -18,9 +18,9 @@
 <h2>Grabaciones por movimiento</h2><ul id="clips"></ul>
 <script>
 const live=document.querySelector('#live'), photo=document.querySelector('#photo'), state=document.querySelector('#state'), toggle=document.querySelector('#toggle'), clips=document.querySelector('#clips');
-// Por HTTPS el reproductor es del mismo origen: se ajusta para que el video entre en el recuadro (go2rtc lo fija
-// en 320 px y en el celular se desbordaba). Por HTTP es de otro origen y el navegador no deja tocarlo.
-live.onload=()=>{try{const st=live.contentDocument.createElement('style');st.textContent='html,body{overflow:hidden;margin:0;background:#161b22}video-stream,video{width:100%!important;height:100%!important;object-fit:contain}';live.contentDocument.head.append(st)}catch{}};
+// Por HTTPS el reproductor es del mismo origen: se ajusta para que el video entre en el recuadro (go2rtc le pone
+// flex:1 0 320px en línea y en el celular se desbordaba). Por HTTP es de otro origen y el navegador no deja tocarlo.
+live.onload=()=>{try{const st=live.contentDocument.createElement('style');st.textContent='html,body{overflow:hidden;margin:0;background:#161b22}video-stream{flex:1 1 auto!important;min-width:0!important}video-stream,video{width:100%!important;height:100%!important;object-fit:contain}';live.contentDocument.head.append(st)}catch{}};
 live.src=location.protocol==='https:'?'/go2rtc/stream.html?src=entrada&mode=mse':'http://'+location.hostname+':1984/stream.html?src=entrada&mode=webrtc';
 let photoMode=false, timer=null;
 function refresh(){if(photoMode&&!document.hidden)photo.src='/camara/imagen?t='+Date.now()}

@@ -195,6 +195,7 @@ defmodule Videorepo.DeployTest do
     assert html =~ ~s(<link rel="manifest" href="/manifest.webmanifest">)
     # El reproductor de go2rtc fija el video en 320 px: en un celular se desbordaba con scroll horizontal.
     assert html =~ "object-fit:contain"
+    assert html =~ "video-stream{flex:1 1 auto!important;min-width:0!important}"
     assert html =~ "live.onload"
   end
 
