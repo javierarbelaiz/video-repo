@@ -159,7 +159,8 @@ defmodule Videorepo.DeployTest do
     html = read("priv/static/camera.html")
     assert html =~ "location.hostname"
     assert html =~ ":1984/stream.html?src=entrada"
-    assert html =~ "webrtc"
+    # Solo WebRTC: con "webrtc,mse" go2rtc 1.9.15 se queda en MSE, que conecta primero.
+    assert html =~ "stream.html?src=entrada&mode=webrtc'"
     # img{display:block} le ganaba al atributo hidden: la foto oculta se veía como imagen rota.
     assert html =~ "[hidden]{display:none!important}"
   end

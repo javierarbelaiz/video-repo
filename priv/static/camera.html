@@ -2,14 +2,14 @@
 <title>Cámara · VideoRepo</title>
 <style>[hidden]{display:none!important}body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}a,button.link{color:#8ac6ff}img,video,iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;background:#161b22}li{margin:.6rem 0}button.link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline}</style>
 <a href="/">← VideoRepo</a><h1>Cámara</h1>
-<!-- En vivo por WebRTC (~0,3 s) con go2rtc en el mismo host; si WebRTC no conecta, el reproductor cae solo a MSE. -->
+<!-- En vivo por WebRTC (~0,3 s) con go2rtc en el mismo host; con webrtc,mse el reproductor se quedaba en MSE (~1 s más). -->
 <iframe id="live" title="Cámara de la entrada en vivo" allow="autoplay; fullscreen" allowfullscreen></iframe>
 <img id="photo" alt="Imagen actual de la cámara" hidden>
 <p id="state" role="status">En vivo. <button class="link" id="toggle" type="button">Ver foto en vez de video</button></p>
 <h2>Grabaciones por movimiento</h2><ul id="clips"></ul>
 <script>
 const live=document.querySelector('#live'), photo=document.querySelector('#photo'), state=document.querySelector('#state'), toggle=document.querySelector('#toggle'), clips=document.querySelector('#clips');
-live.src='http://'+location.hostname+':1984/stream.html?src=entrada&mode=webrtc,mse';
+live.src='http://'+location.hostname+':1984/stream.html?src=entrada&mode=webrtc';
 let photoMode=false, timer=null;
 function refresh(){if(photoMode&&!document.hidden)photo.src='/camara/imagen?t='+Date.now()}
 photo.onload=()=>{if(!photoMode)return;state.firstChild.textContent='Foto de las '+new Date().toLocaleTimeString()+'. ';timer=setTimeout(refresh,1000)};
