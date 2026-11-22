@@ -193,6 +193,9 @@ defmodule Videorepo.DeployTest do
     assert html =~ "/go2rtc/stream.html?src=entrada&mode=mse"
     assert html =~ ":1984/stream.html?src=entrada&mode=webrtc"
     assert html =~ ~s(<link rel="manifest" href="/manifest.webmanifest">)
+    # El reproductor de go2rtc fija el video en 320 px: en un celular se desbordaba con scroll horizontal.
+    assert html =~ "object-fit:contain"
+    assert html =~ "live.onload"
   end
 
   test "el manifest instala la cámara como app" do
