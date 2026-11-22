@@ -167,6 +167,14 @@ defmodule Videorepo.DeployTest do
     assert html =~ "[hidden]{display:none!important}"
   end
 
+  test "la página de la cámara tiene el pad PTZ con freno al soltar" do
+    html = read("priv/static/camera.html")
+    for d <- ~w(up down left right zoom_in zoom_out), do: assert(html =~ ~s(data-dir="#{d}"))
+    assert html =~ "/camara/ptz/move"
+    assert html =~ "/camara/ptz/stop"
+    for ev <- ~w(pointerup pointerleave pointercancel), do: assert(html =~ ev)
+  end
+
   test "la sincronización convierte los clips a H.264 antes de subirlos" do
     py = read("scripts/sync_camera.py")
     assert py =~ "libx264"

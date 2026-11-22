@@ -50,6 +50,10 @@ El camino normal es **push a `main`**:
 - **Cámara en vivo:** `go2rtc` (k8s/go2rtc.yaml, hostNetwork en mykaly, puertos 1984 y 8555) toma el canal
   H.264 de la cámara y lo sirve por WebRTC (~0,3 s) a `/camara`. Usuario, clave y host de la cámara viven en el
   Secret `camara-rtsp` (copia SOPS en `deploy/secretos/`); la API solo expone el reproductor (`allow_paths`).
+- **Motor de la cámara (PTZ):** el pad de `/camara` manda `POST /camara/ptz/move` (dirección, velocidad,
+  duración) y `/camara/ptz/stop`; VideoRepo valida y reenvía al grabador del box (`CAMERA_URL`), que maneja la
+  cámara por ONVIF con sus credenciales. Cada movimiento frena solo (tope 2 s). La cámara no informa posición
+  ni presets: los movimientos son relativos.
 - **Clips por movimiento:** el grabador del box los escribe en MPEG-4 Part 2; `camara-sync` los convierte a
   H.264 (`+faststart`) antes de subirlos, para que se vean en el navegador y la TV.
 - **Datos:** el Namespace y el PVC `videos` llevan `Prune=false,Delete=false`: Argo nunca los borra.

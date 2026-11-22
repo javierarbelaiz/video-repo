@@ -28,7 +28,37 @@ defmodule Videorepo.Router do
 
   plug :dispatch
 
+  @ptz_directions ~w(left right up down zoom_in zoom_out)
+
   defp dir, do: Application.get_env(:videorepo, :video_dir, "/data/videos")
+
+  defp ptz_direction(d) when d in @ptz_directions, do: {:ok, d}
+  defp ptz_direction(_), do: :invalid
+
+  # Número del formulario acotado a [min, max]; si no es número, el valor por defecto.
+  defp clamp(value, default, min, max) do
+    number =
+      case value && Float.parse(to_string(value)) do
+        {n, _} -> n
+        _ -> default
+      end
+
+    number |> max(min) |> min(max) |> Float.round(2)
+  end
+
+  # Cliente HTTP de Erlang (inets): sin depender de un curl externo.
+  defp ptz_forward(conn, base, path, json) do
+    url = String.to_charlist(String.trim_trailing(base, "/") <> path)
+    request = {url, [], ~c"application/json", json}
+
+    case :httpc.request(:post, request, [timeout: 15_000, connect_timeout: 5_000], body_format: :binary) do
+      {:ok, {{_, status, _}, _headers, body}} when status in 200..299 ->
+        conn |> put_resp_content_type("application/json") |> send_resp(200, body)
+
+      _ ->
+        send_resp(conn, 502, "La cámara no respondió")
+    end
+  end
 
   defp send_page(conn, rel) do
     conn
@@ -43,6 +73,34 @@ defmodule Videorepo.Router do
   get "/", do: send_page(conn, "index.html")
 
   get "/camara", do: send_page(conn, "camera.html")
+
+  # Control del motor de la cámara (PTZ): la página manda la orden acá, se valida y se reenvía al grabador
+  # del box, que es el que tiene las credenciales ONVIF. Solo pasan dirección, velocidad y duración válidas.
+
+  post "/camara/ptz/move" do
+    params = conn.body_params
+
+    with url when is_binary(url) and url != "" <- System.get_env("CAMERA_URL"),
+         {:ok, direction} <- ptz_direction(params["direction"]) do
+      body = %{
+        "direction" => direction,
+        "speed" => clamp(params["speed"], 0.5, 0.1, 1.0),
+        "seconds" => clamp(params["seconds"], 1.5, 0.1, 2.0)
+      }
+
+      ptz_forward(conn, url, "/ptz/move", Jason.encode!(body))
+    else
+      :invalid -> send_resp(conn, 400, "Dirección desconocida")
+      _ -> send_resp(conn, 503, "Cámara sin configurar")
+    end
+  end
+
+  post "/camara/ptz/stop" do
+    case System.get_env("CAMERA_URL") do
+      url when is_binary(url) and url != "" -> ptz_forward(conn, url, "/ptz/stop", "{}")
+      _ -> send_resp(conn, 503, "Cámara sin configurar")
+    end
+  end
 
   # La dirección del grabador (una IP privada de la casa) llega por CAMERA_URL desde el Secret
   # videorepo-red: no va en el repo. Sin ella la página dice que no hay señal.

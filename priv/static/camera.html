@@ -1,10 +1,16 @@
 <!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cámara · VideoRepo</title>
-<style>[hidden]{display:none!important}body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}a,button.link{color:#8ac6ff}img,video,iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;background:#161b22}li{margin:.6rem 0}button.link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline}</style>
+<style>[hidden]{display:none!important}body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}a,button.link{color:#8ac6ff}img,video,iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;background:#161b22}li{margin:.6rem 0}.pad{display:grid;grid-template-columns:repeat(3,3.2rem);gap:.4rem;margin:.8rem 0}.pad button{height:3.2rem;font-size:1.3rem;border:1px solid #30363d;border-radius:.6rem;background:#161b22;color:#eee;cursor:pointer;touch-action:none;user-select:none}.pad button:active,.pad button.on{background:#1f6feb}.pad button:focus-visible{outline:2px solid #8ac6ff}.zoom{display:flex;gap:.4rem}.zoom button{width:3.2rem}button.link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline}</style>
 <a href="/">← VideoRepo</a><h1>Cámara</h1>
 <!-- En vivo por WebRTC (~0,3 s) con go2rtc en el mismo host; con webrtc,mse el reproductor se quedaba en MSE (~1 s más). -->
 <iframe id="live" title="Cámara de la entrada en vivo" allow="autoplay; fullscreen" allowfullscreen></iframe>
 <img id="photo" alt="Imagen actual de la cámara" hidden>
+<div class="pad" role="group" aria-label="Mover la cámara (mantené apretado; flechas del teclado)">
+  <span></span><button type="button" data-dir="up" aria-label="Arriba">▲</button><span></span>
+  <button type="button" data-dir="left" aria-label="Izquierda">◀</button><button type="button" data-stop aria-label="Detener">■</button><button type="button" data-dir="right" aria-label="Derecha">▶</button>
+  <span></span><button type="button" data-dir="down" aria-label="Abajo">▼</button><span></span>
+</div>
+<div class="zoom pad" role="group" aria-label="Zoom"><button type="button" data-dir="zoom_in" aria-label="Acercar">＋</button><button type="button" data-dir="zoom_out" aria-label="Alejar">－</button></div>
 <p id="state" role="status">En vivo. <button class="link" id="toggle" type="button">Ver foto en vez de video</button></p>
 <h2>Grabaciones por movimiento</h2><ul id="clips"></ul>
 <script>
@@ -29,4 +35,20 @@ async function list(){try{
   if(!files.length)clips.textContent='Todavía no hay clips.';
 }catch{clips.textContent='No se pudo cargar la lista.'}}
 list();setInterval(list,30000);
+// Pad PTZ: mientras se mantiene apretado se repite la orden (cada una frena sola a los 1,5 s en el grabador);
+// al soltar, salir del botón o cancelar el toque se manda stop.
+const ptzSend=(path,body)=>fetch(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body)}).catch(()=>{});
+let held=null, repeat=null;
+function ptzStart(btn){ptzEnd();held=btn;btn.classList.add('on');const go=()=>ptzSend('/camara/ptz/move',{direction:btn.dataset.dir,speed:'0.6',seconds:'1.5'});go();repeat=setInterval(go,1000)}
+function ptzEnd(){if(!held)return;clearInterval(repeat);repeat=null;held.classList.remove('on');held=null;ptzSend('/camara/ptz/stop',{})}
+document.querySelectorAll('[data-dir]').forEach(b=>{
+  b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);ptzStart(b)});
+  for(const ev of ['pointerup','pointerleave','pointercancel'])b.addEventListener(ev,ptzEnd);
+  b.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ptzSend('/camara/ptz/move',{direction:b.dataset.dir,speed:'0.6',seconds:'0.6'})}});
+});
+document.querySelector('[data-stop]').addEventListener('click',()=>{ptzEnd();ptzSend('/camara/ptz/stop',{})});
+const keys={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right','+':'zoom_in','-':'zoom_out'};
+document.addEventListener('keydown',e=>{const d=keys[e.key];if(!d||e.target.closest('[data-dir]'))return;e.preventDefault();ptzSend('/camara/ptz/move',{direction:d,speed:'0.6',seconds:'0.6'})});
+window.addEventListener('blur',ptzEnd);
+
 </script></html>

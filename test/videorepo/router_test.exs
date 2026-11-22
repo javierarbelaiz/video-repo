@@ -125,4 +125,68 @@ defmodule Videorepo.RouterTest do
     assert conn.status == 200
     assert conn.resp_body =~ "Cámara"
   end
+  describe "control de la cámara (PTZ)" do
+    defmodule FakeRecorder do
+      use Plug.Router
+      plug :match
+      plug Plug.Parsers, parsers: [:json], json_decoder: Jason
+      plug :dispatch
+
+      post "/ptz/move" do
+        send(Application.get_env(:videorepo, :fake_recorder_pid), {:move, conn.body_params})
+        send_resp(conn, 200, ~s({"direction":"#{conn.body_params["direction"]}"}))
+      end
+
+      post "/ptz/stop" do
+        send(Application.get_env(:videorepo, :fake_recorder_pid), :stop)
+        send_resp(conn, 200, ~s({"stopped":true}))
+      end
+    end
+
+    setup do
+      original = System.get_env("CAMERA_URL")
+      on_exit(fn -> if original, do: System.put_env("CAMERA_URL", original), else: System.delete_env("CAMERA_URL") end)
+      :ok
+    end
+
+    defp form(path, body) do
+      conn(:post, path, body)
+      |> put_req_header("content-type", "application/x-www-form-urlencoded")
+      |> call()
+    end
+
+    defp start_fake_recorder do
+      Application.put_env(:videorepo, :fake_recorder_pid, self())
+      {:ok, pid} = Bandit.start_link(plug: FakeRecorder, port: 0, ip: {127, 0, 0, 1}, startup_log: false)
+      {:ok, {_ip, port}} = ThousandIsland.listener_info(pid)
+      System.put_env("CAMERA_URL", "http://127.0.0.1:#{port}")
+      pid
+    end
+
+    test "sin CAMERA_URL el movimiento y el stop responden 503" do
+      System.delete_env("CAMERA_URL")
+      assert form("/camara/ptz/move", "direction=right").status == 503
+      assert form("/camara/ptz/stop", "").status == 503
+    end
+
+    test "una dirección desconocida se rechaza sin llamar al grabador" do
+      System.put_env("CAMERA_URL", "http://127.0.0.1:9")
+      conn = form("/camara/ptz/move", "direction=diagonal")
+      assert conn.status == 400
+    end
+
+    test "reenvía al grabador solo dirección, velocidad y duración válidas" do
+      start_fake_recorder()
+      conn = form("/camara/ptz/move", "direction=left&speed=9&seconds=60&extra=hola")
+      assert conn.status == 200
+      assert_receive {:move, body}, 5_000
+      assert body == %{"direction" => "left", "speed" => 1.0, "seconds" => 2.0}
+    end
+
+    test "el stop se reenvía al grabador" do
+      start_fake_recorder()
+      assert form("/camara/ptz/stop", "").status == 200
+      assert_receive :stop, 5_000
+    end
+  end
 end
