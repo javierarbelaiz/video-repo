@@ -133,6 +133,12 @@ defmodule Videorepo.DeployTest do
       assert cfg =~ "/api/webrtc"
     end
 
+    test "usa el comando de la imagen (tini + go2rtc) y la config en /config/go2rtc.yaml" do
+      app = doc("Deployment", "go2rtc")
+      refute app =~ ~r/^\s+(args|command):/m, "args/command reemplazan el CMD y tini ejecuta '-config'"
+      assert app =~ "mountPath: /config"
+    end
+
     test "no reexpone la cámara por RTSP en la red", %{cfg: cfg} do
       assert cfg =~ ~r/rtsp:\s*\n\s+listen: ""/
     end

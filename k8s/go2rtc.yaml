@@ -56,8 +56,8 @@ spec:
         kubernetes.io/hostname: mykaly   # el nodo de NODE_IP, el que conoce la TV
       containers:
         - name: go2rtc
+          # Sin args/command: la imagen arranca con tini + go2rtc y ya lee /config/go2rtc.yaml.
           image: alexxit/go2rtc:1.9.15@sha256:e098de5c2f8040dc3d4784ed2d5cfdac3b0979f9349afe587ef6a670a14b9f4d
-          args: ["-config", "/config/go2rtc.yaml"]
           envFrom:
             - secretRef: { name: camara-rtsp }
           env:
