@@ -44,10 +44,15 @@ defmodule Videorepo.Router do
 
   get "/camara", do: send_page(conn, "camera.html")
 
+  # La dirección del grabador (una IP privada de la casa) llega por CAMERA_URL desde el Secret
+  # videorepo-red: no va en el repo. Sin ella la página dice que no hay señal.
   get "/camara/imagen" do
     conn = put_resp_header(conn, "cache-control", "no-store")
-    case System.cmd("curl", ["-fs", "--max-time", "4", "http://192.168.1.251:8191/snapshot"]) do
-      {jpeg, 0} -> conn |> put_resp_content_type("image/jpeg") |> send_resp(200, jpeg)
+
+    with url when is_binary(url) and url != "" <- System.get_env("CAMERA_URL"),
+         {jpeg, 0} <- System.cmd("curl", ["-fs", "--max-time", "4", String.trim_trailing(url, "/") <> "/snapshot"]) do
+      conn |> put_resp_content_type("image/jpeg") |> send_resp(200, jpeg)
+    else
       _ -> send_resp(conn, 503, "Cámara sin señal")
     end
   end

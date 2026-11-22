@@ -2,7 +2,7 @@
 
 App **Elixir** (Plug + Bandit) para **subir videos de alta calidad** por una web sencilla
 y **servirlos por HTTP con soporte de Range** (reproducción resumible / seek → aguanta
-reconexiones de la TV). Corre en un **pod** del k3s de `MyKaly` (192.168.1.199) y guarda
+reconexiones de la TV). Corre en un **pod** del k3s de `MyKaly` y guarda
 los archivos en el disco de 1 TB (`/data`) vía un PVC.
 
 Encaja con [[noblex-cam]]: la app de la TV reproduce cualquier `http://…/videos/x.mp4` de aquí.
@@ -28,41 +28,37 @@ navegador ──subir──▶  Pod (Bandit/Plug)  ──guarda──▶  PVC lo
 | GET | `/videos/:name` | sirve el video con Range |
 | GET | `/api/videos` | JSON con la lista |
 | DELETE | `/videos/:name` | borra un video |
+| GET | `/camara` | imagen en vivo de la cámara de la entrada + clips grabados |
 | GET | `/health` | readiness/liveness de k8s |
 
-## Deploy
+## Deploy (Argo CD)
 
-La imagen se construye en **GitHub Actions → ghcr.io** (el nodo no tiene docker). k3s la baja.
+El camino normal es **push a `main`**:
 
-```sh
-# 1) push -> Actions construye ghcr.io/javierarbelaiz/videorepo:latest
-git push
+1. `.github/workflows/deploy.yml` corre `mix test`, construye la imagen y la publica en ghcr (privada)
+   como `ghcr.io/javierarbelaiz/videorepo:sha-<7>`.
+2. La misma Action actualiza `newTag` en `k8s/kustomization.yaml` con un commit `[skip ci]`.
+3. Argo CD (Application `videorepo` en `Devs/homelab-argocd`) sincroniza `k8s/`: la app, el mDNS
+   (`videorepo.local`) y el CronJob `camara-sync`, que trae los clips del grabador de la cámara.
 
-# 2) hacer PÚBLICO el paquete (una vez): GitHub → tu perfil → Packages →
-#    videorepo → Package settings → Change visibility → Public
-#    (así k3s lo baja sin secret; la imagen no contiene datos, solo la app)
+- **Volver atrás:** poner en `k8s/kustomization.yaml` un `sha-<7>` ya publicado y hacer push.
+- **IPs de la casa:** no van en el repo. La IP del nodo (`NODE_IP`) y el grabador de la cámara
+  (`CAMERA_URL`) viven en el Secret `videorepo-red`: `deploy/red.ps1` lo carga y guarda la copia
+  cifrada con SOPS en `deploy/secretos/`; `deploy/red.ps1 aplicar` lo restaura. Ver `.env.example`.
+- **Imagen privada:** el cluster la baja con el Secret `ghcr-pull` del namespace.
+- **Datos:** el Namespace y el PVC `videos` llevan `Prune=false,Delete=false`: Argo nunca los borra.
+- Al arrancar, el contenedor (`rel/boot.sh`) deja ffmpeg/yt-dlp/deno en el volumen (yt-dlp se
+  actualiza en cada arranque) y genera el certificado HTTPS si falta.
 
-# 3) desplegar en k3s (kubectl funciona sin sudo en MyKaly)
-kubectl apply -f k8s/videorepo.yaml
-kubectl -n videorepo rollout status deploy/videorepo
-```
-
-Acceso: **http://192.168.1.199:30080**
-
-### Actualizar
-
-```sh
-git push                                   # Actions reconstruye la imagen
-kubectl -n videorepo rollout restart deploy/videorepo
-```
+Acceso: `http://<ip-del-nodo>:30080` (TV) y `https://<ip-del-nodo>:30443/vr` (WebXR).
 
 ## Reproducir en la TV (Noblex)
 
 Copia la URL de un video desde la UI y lánzala (sin recompilar la app de la TV):
 
 ```sh
-adb -s 192.168.1.96:5555 shell am start -n com.example.noblexcam/.MainActivity \
-  -e url "http://192.168.1.199:30080/videos/mipeli.mp4"
+adb -s <ip-de-la-tv>:5555 shell am start -n com.example.noblexcam/.MainActivity \
+  -e url "http://<ip-del-nodo>:30080/videos/mipeli.mp4"
 ```
 
 ## Config (env)
@@ -72,3 +68,6 @@ adb -s 192.168.1.96:5555 shell am start -n com.example.noblexcam/.MainActivity \
 | `PORT` | `4000` | puerto HTTP |
 | `VIDEO_DIR` | `/data/videos` | carpeta de storage (montaje del PVC) |
 | `TMPDIR` | `/data/videos/.uploads` | temp de subidas (mismo FS → mover = rename) |
+| `TOOLS_DIR` | `/data/videos/.tools` | ffmpeg, yt-dlp y deno (en el volumen) |
+| `TLS_HOST` | — | IP del nodo para el cert HTTPS (Secret `videorepo-red`, `NODE_IP`) |
+| `CAMERA_URL` | — | grabador de la cámara (Secret `videorepo-red`); sin ella `/camara/imagen` da 503 |

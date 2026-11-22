@@ -1,0 +1,45 @@
+# Trae los clips terminados del grabador de la cámara (corre en el box, fuera del cluster) y los sube a
+# VideoRepo como CamNet_record_*.mp4. Reemplaza al cron que corría en el nodo.
+# La dirección del grabador llega del Secret videorepo-red (CAMERA_URL). ffprobe sale del volumen.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: camara-sync
+  namespace: videorepo
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 240
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      ttlSecondsAfterFinished: 3600
+      template:
+        metadata:
+          labels: { app: camara-sync }
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - { name: ghcr-pull }
+          containers:
+            - name: sync
+              image: ghcr.io/javierarbelaiz/videorepo
+              command: ["python3", "/app/scripts/sync_camera.py"]
+              env:
+                - name: CAMERA_URL
+                  valueFrom: { secretKeyRef: { name: videorepo-red, key: CAMERA_URL } }
+                - { name: REPO_URL, value: "http://videorepo.videorepo.svc.cluster.local" }
+                - { name: FFPROBE, value: /data/videos/.tools/ffprobe }
+                - { name: TMPDIR, value: /tmp }
+              resources:
+                requests: { cpu: 20m, memory: 48Mi }
+                limits: { memory: 256Mi }
+              volumeMounts:
+                - { name: videos, mountPath: /data/videos, readOnly: true }
+          volumes:
+            - name: videos
+              persistentVolumeClaim:
+                claimName: videos

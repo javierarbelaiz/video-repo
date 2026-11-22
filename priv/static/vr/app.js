@@ -165,7 +165,7 @@ function enterVR() {
     enterBtn.disabled = false;
     show('err', 'No hay WebXR en este navegador. La causa habitual es haber entrado por ' +
       '<code>http://</code>: WebXR solo funciona sobre <code>https://</code>. ' +
-      'Proba con <code>https://192.168.1.199:30443/vr</code>.');
+      'Proba con <code>https://' + location.hostname + ':30443/vr</code>.');
     return;
   }
 

@@ -110,4 +110,19 @@ defmodule Videorepo.RouterTest do
     assert conn.status == 200
     assert get_resp_header(conn, "accept-ranges") == ["bytes"]
   end
+  test "GET /camara/imagen sin CAMERA_URL responde 503 sin salir a la red" do
+    original = System.get_env("CAMERA_URL")
+    System.delete_env("CAMERA_URL")
+    on_exit(fn -> if original, do: System.put_env("CAMERA_URL", original) end)
+
+    conn = conn(:get, "/camara/imagen") |> call()
+    assert conn.status == 503
+    assert get_resp_header(conn, "cache-control") == ["no-store"]
+  end
+
+  test "GET /camara sirve la página de la cámara" do
+    conn = conn(:get, "/camara") |> call()
+    assert conn.status == 200
+    assert conn.resp_body =~ "Cámara"
+  end
 end

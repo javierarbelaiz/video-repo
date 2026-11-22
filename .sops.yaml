@@ -1,0 +1,10 @@
+# Cifrado de los secretos del repo con SOPS + age (misma clave que esenzia; la privada vive en
+# %APPDATA%\sops\age\keys.txt y se respalda fuera de la maquina). Solo se cifran data/stringData.
+
+creation_rules:
+    # Separador agnostico: corriendo desde Windows, sops ve la ruta con `\` y
+    # con un patron que pide `/` no encuentra la regla ("no matching creation
+    # rules found"). Los despliegues salen de Windows y del nodo por igual.
+  - path_regex: secretos[\\/].*\.enc\.ya?ml$
+    encrypted_regex: '^(data|stringData)$'
+    age: age138ph6qsw2genyv3dhkvh2jwaqkw9436mmls3607mu45mpqpw5ums6j0m8a

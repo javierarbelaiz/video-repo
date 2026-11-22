@@ -70,9 +70,14 @@ defmodule Videorepo.ApplicationTest do
     Application.put_env(:videorepo, :port, 45123)
     Application.put_env(:videorepo, :tls_port, 45124)
 
+    # `mix test` ya arrancó la app con el mismo supervisor con nombre: sin pararla, start/2 devuelve
+    # {:error, {:already_started, _}}. Se detiene para este test y se vuelve a levantar al final.
+    :ok = Application.stop(:videorepo)
+
     on_exit(fn ->
       restore_env(:port, original_port)
       restore_env(:tls_port, original_tls_port)
+      {:ok, _} = Application.ensure_all_started(:videorepo)
     end)
 
     assert {:ok, pid} = Videorepo.Application.start(:normal, [])

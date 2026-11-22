@@ -23,7 +23,7 @@
 #
 set -euo pipefail
 
-NODE="${VIDEOREPO_NODE:-thehook@192.168.1.199}"
+NODE="${VIDEOREPO_NODE:-thehook@mykaly}"
 NS="${VIDEOREPO_NS:-videorepo}"
 WORK=/tmp/t
 

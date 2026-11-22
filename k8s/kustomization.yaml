@@ -1,0 +1,12 @@
+# Lo que Argo CD aplica (Application videorepo en homelab-argocd). La etiqueta la actualiza
+# .github/workflows/deploy.yml en cada push a main; para volver atrás, poner un sha-<7> ya publicado.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: videorepo
+resources:
+  - app.yaml
+  - mdns.yaml
+  - camara-sync.yaml
+images:
+  - name: ghcr.io/javierarbelaiz/videorepo
+    newTag: sha-0000000

@@ -1,0 +1,91 @@
+# VideoRepo: sube y sirve videos por HTTP Range para la TV (NodePort 30080) y HTTPS para WebXR (30443).
+# Lo despliega Argo CD (Application videorepo, path k8s/): cada push a main construye
+# ghcr.io/javierarbelaiz/videorepo:sha-<7> y actualiza la etiqueta en kustomization.yaml.
+#
+# Las IPs de la casa NO van en el repo: llegan del Secret videorepo-red (NODE_IP, CAMERA_URL), que se
+# carga con deploy/red.ps1 y se respalda cifrado con SOPS. Argo no lo gestiona.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: videorepo
+  annotations:
+    # Los videos viven acá: Argo nunca poda ni borra el namespace.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: videos
+  namespace: videorepo
+  annotations:
+    # 200 GB de videos, herramientas y el cert TLS: Argo nunca lo poda ni lo borra.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path          # provisiona en /data/k3s-storage (disco 1TB)
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: videorepo
+  namespace: videorepo
+  labels: { app: videorepo }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: videorepo }
+  strategy:
+    type: Recreate                       # el PV es RWO: un solo pod a la vez
+  template:
+    metadata:
+      labels: { app: videorepo }
+    spec:
+      imagePullSecrets:
+        - { name: ghcr-pull }
+      containers:
+        - name: videorepo
+          image: ghcr.io/javierarbelaiz/videorepo
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TLS_HOST
+              valueFrom: { secretKeyRef: { name: videorepo-red, key: NODE_IP } }
+            - name: CAMERA_URL
+              valueFrom: { secretKeyRef: { name: videorepo-red, key: CAMERA_URL, optional: true } }
+          ports:
+            - containerPort: 4000
+            - containerPort: 4443
+          volumeMounts:
+            - { name: videos, mountPath: /data/videos }
+          startupProbe:                     # el arranque baja yt-dlp en cada boot
+            httpGet: { path: /health, port: 4000 }
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /health, port: 4000 }
+            periodSeconds: 20
+      volumes:
+        - name: videos
+          persistentVolumeClaim:
+            claimName: videos
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: videorepo
+  namespace: videorepo
+spec:
+  type: NodePort
+  selector: { app: videorepo }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4000
+      nodePort: 30080                     # http://<nodo>:30080 — lo usa la TV
+    - name: https
+      port: 443
+      targetPort: 4443
+      nodePort: 30443                     # https://<nodo>:30443/vr — WebXR

@@ -1,5 +1,5 @@
-# Responder mDNS en un pod (hostNetwork) que publica videorepo.local -> IP del nodo,
-# sin necesitar avahi ni sudo en el host. Imagen publica python:3.12-slim.
+# Responder mDNS en un pod (hostNetwork) que publica videorepo.local -> IP del nodo, sin avahi ni sudo
+# en el host. La IP llega del Secret videorepo-red (NODE_IP): no va en el repo.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,15 +19,18 @@ spec:
       containers:
         - name: mdns
           image: python:3.12-slim
+          env:
+            - name: NODE_IP
+              valueFrom: { secretKeyRef: { name: videorepo-red, key: NODE_IP } }
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -e
               pip install --no-cache-dir --root-user-action=ignore zeroconf
               cat > /mdns.py <<'PY'
-              import socket, time
+              import os, socket, time
               from zeroconf import Zeroconf, ServiceInfo
-              IP = "192.168.1.199"
+              IP = os.environ["NODE_IP"]
               zc = Zeroconf()
               info = ServiceInfo(
                   "_http._tcp.local.",
@@ -37,7 +40,7 @@ spec:
                   server="videorepo.local.",
               )
               zc.register_service(info)
-              print("mDNS: videorepo.local ->", IP, flush=True)
+              print("mDNS: videorepo.local publicado", flush=True)
               while True:
                   time.sleep(3600)
               PY

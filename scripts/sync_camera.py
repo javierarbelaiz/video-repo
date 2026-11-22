@@ -1,5 +1,6 @@
 """Import completed motion clips from the recorder into VideoRepo."""
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -7,8 +8,11 @@ from pathlib import Path
 from urllib.request import urlopen
 from shutil import copyfileobj
 
-CAM = "http://192.168.1.251:8191"
-REPO = "http://127.0.0.1:30080"
+# Las direcciones llegan por el entorno (CronJob camara-sync, Secret videorepo-red): la del grabador
+# es una IP privada de la casa y no va en el repo.
+CAM = os.environ.get("CAMERA_URL", "").rstrip("/")
+REPO = os.environ.get("REPO_URL", "http://videorepo.videorepo.svc.cluster.local").rstrip("/")
+FFPROBE = os.environ.get("FFPROBE", "ffprobe")
 
 
 def read_json(url):
@@ -32,7 +36,7 @@ def sync():
             video = Path(temp) / dest
             with urlopen(CAM + "/recordings/" + name, timeout=30) as src, video.open("wb") as out:
                 copyfileobj(src, out)
-            result = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+            result = subprocess.run([FFPROBE, "-v", "error", "-select_streams", "v:0",
                 "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(video)], capture_output=True)
             if result.returncode or not result.stdout.strip():
                 continue
@@ -41,4 +45,6 @@ def sync():
 
 
 if __name__ == "__main__":
+    if not CAM:
+        raise SystemExit("falta CAMERA_URL (Secret videorepo-red)")
     sync()

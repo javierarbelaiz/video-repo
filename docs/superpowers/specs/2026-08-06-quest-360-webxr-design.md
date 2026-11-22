@@ -5,9 +5,9 @@ Estado: aprobado, listo para plan de implementación
 
 ## Problema
 
-Se quiere ver video 360 equirectangular en un Meta Quest (192.168.1.121), usando
+Se quiere ver video 360 equirectangular en un Meta Quest (<ip-del-quest>), usando
 como fuente el repo de videos Elixir que ya corre en el k3s de MyKaly
-(192.168.1.199, NodePort 30080).
+(<ip-del-nodo>, NodePort 30080).
 
 El visor **no tiene modo desarrollador** habilitado: el puerto adb 5555 está
 cerrado y activarlo exige una organización de desarrollador verificada en Meta
@@ -40,7 +40,7 @@ bloqueado por un trámite ajeno al código.
 `http://`, y la única excepción es `localhost` — que no aplica cuando el visor
 pide contenido a otra máquina de la red.
 
-Consecuencia directa: `http://192.168.1.199:30080` no puede servir la app. Hace
+Consecuencia directa: `http://<ip-del-nodo>:30080` no puede servir la app. Hace
 falta TLS. Esto no es una preferencia; sin ello la API no está disponible.
 
 Referencias:
@@ -67,8 +67,8 @@ Alternativas descartadas:
 ## Arquitectura
 
 ```
-Quest Browser (192.168.1.121)
-   └─> https://192.168.1.199:30443/vr        página WebXR
+Quest Browser (<ip-del-quest>)
+   └─> https://<ip-del-nodo>:30443/vr        página WebXR
          ├─> GET /api/videos                 mismo origen, sin CORS
          │     └─ filtra los `_360` en el cliente
          └─> <video src="/videos/x_360.mp4"> Range 206 existente = seek
@@ -136,7 +136,7 @@ Configuración, siguiendo el patrón de `PORT` y `VIDEO_DIR` en `config/runtime.
 |---|---|---|
 | `TLS_PORT` | `4443` | Puerto del listener HTTPS |
 | `TLS_DIR` | `/data/videos/.certs` | Carpeta de `cert.pem` y `key.pem`, en el PVC |
-| `TLS_HOST` | `192.168.1.199` | CN y SAN del certificado autogenerado |
+| `TLS_HOST` | `<ip-del-nodo>` | CN y SAN del certificado autogenerado |
 
 Certificado autofirmado generado **al boot si no existe**, replicando el patrón
 ya usado para ffmpeg y yt-dlp:
@@ -144,8 +144,8 @@ ya usado para ffmpeg y yt-dlp:
 ```sh
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout "$TLS_DIR/key.pem" -out "$TLS_DIR/cert.pem" \
-  -subj "/CN=192.168.1.199" \
-  -addext "subjectAltName=IP:192.168.1.199,DNS:videorepo.local"
+  -subj "/CN=<ip-del-nodo>" \
+  -addext "subjectAltName=IP:<ip-del-nodo>,DNS:videorepo.local"
 ```
 
 Se guarda en el PVC (`/data/videos/.certs`): fuera de git, sobrevive reinicios.
@@ -160,7 +160,7 @@ dejar sin video al Noblex.
 
 Si el navegador del Quest rechaza el autofirmado incluso tras aceptar la
 advertencia, el plan B es un certificado real de Let's Encrypt por desafío DNS-01
-sobre un subdominio de `esenzia.shop` apuntando por `A` a 192.168.1.199. El video
+sobre un subdominio de `esenzia.shop` apuntando por `A` a <ip-del-nodo>. El video
 sigue sin salir de la LAN.
 
 ### Despliegue
@@ -173,7 +173,7 @@ Tres cambios en `k8s/videorepo-src.yaml`:
 3. `openssl` en el `apt-get install` del boot, más la generación del cert.
 
 **El puerto HTTP 4000 → NodePort 30080 no se toca.** La TV Noblex reproduce desde
-ahí (`http://192.168.1.199:30080/videos/x.mp4`) y romperlo sería daño colateral
+ahí (`http://<ip-del-nodo>:30080/videos/x.mp4`) y romperlo sería daño colateral
 evitable. El HTTPS entra como listener adicional, nunca como reemplazo.
 
 Actualización: `git pull` en `/home/thehook/video-repo` en el nodo →
