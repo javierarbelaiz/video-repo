@@ -42,6 +42,16 @@ defmodule Videorepo.Router do
 
   get "/", do: send_page(conn, "index.html")
 
+  get "/camara", do: send_page(conn, "camera.html")
+
+  get "/camara/imagen" do
+    conn = put_resp_header(conn, "cache-control", "no-store")
+    case System.cmd("curl", ["-fs", "--max-time", "4", "http://192.168.1.251:8191/snapshot"]) do
+      {jpeg, 0} -> conn |> put_resp_content_type("image/jpeg") |> send_resp(200, jpeg)
+      _ -> send_resp(conn, 503, "Cámara sin señal")
+    end
+  end
+
   get "/vr", do: send_page(conn, "vr/index.html")
 
   get "/api/videos" do
