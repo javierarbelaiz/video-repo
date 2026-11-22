@@ -9,4 +9,4 @@ resources:
   - camara-sync.yaml
 images:
   - name: ghcr.io/javierarbelaiz/videorepo
-    newTag: sha-0000000
+    newTag: sha-8fbee86
