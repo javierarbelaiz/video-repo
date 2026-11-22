@@ -9,4 +9,4 @@ resources:
   - go2rtc.yaml
 images:
   - name: ghcr.io/javierarbelaiz/videorepo
-    newTag: sha-7cc5941
+    newTag: sha-202cc8c
