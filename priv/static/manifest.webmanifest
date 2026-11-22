@@ -1,0 +1,14 @@
+{
+  "name": "Cámara",
+  "short_name": "Cámara",
+  "description": "Cámara de la entrada en vivo, motor y grabaciones.",
+  "start_url": "/camara",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1116",
+  "theme_color": "#0e1116",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

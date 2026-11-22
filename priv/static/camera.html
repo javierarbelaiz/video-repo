@@ -1,8 +1,11 @@
 <!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cámara · VideoRepo</title>
-<style>[hidden]{display:none!important}body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}a,button.link{color:#8ac6ff}img,video,iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;background:#161b22}li{margin:.6rem 0}.pad{display:grid;grid-template-columns:repeat(3,3.2rem);gap:.4rem;margin:.8rem 0}.pad button{height:3.2rem;font-size:1.3rem;border:1px solid #30363d;border-radius:.6rem;background:#161b22;color:#eee;cursor:pointer;touch-action:none;user-select:none}.pad button:active,.pad button.on{background:#1f6feb}.pad button:focus-visible{outline:2px solid #8ac6ff}.zoom{display:flex;gap:.4rem}.zoom button{width:3.2rem}button.link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline}</style>
+<link rel="manifest" href="/manifest.webmanifest"><meta name="theme-color" content="#0e1116"><link rel="icon" href="/icon.svg" type="image/svg+xml">
+<style>[hidden]{display:none!important}body{font:1rem system-ui;background:#0e1116;color:#eee;max-width:54rem;margin:auto;padding:1.2rem}@media (max-width:600px){body{padding:.6rem}.pad{grid-template-columns:repeat(3,min(22vw,4.2rem))!important}.pad button{height:min(22vw,4.2rem)!important;font-size:1.6rem!important}.zoom button{width:min(22vw,4.2rem)!important}h1{margin:.4rem 0}}a,button.link{color:#8ac6ff}img,video,iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;background:#161b22}li{margin:.6rem 0}.pad{display:grid;grid-template-columns:repeat(3,3.2rem);gap:.4rem;margin:.8rem 0}.pad button{height:3.2rem;font-size:1.3rem;border:1px solid #30363d;border-radius:.6rem;background:#161b22;color:#eee;cursor:pointer;touch-action:none;user-select:none}.pad button:active,.pad button.on{background:#1f6feb}.pad button:focus-visible{outline:2px solid #8ac6ff}.zoom{display:flex;gap:.4rem}.zoom button{width:3.2rem}button.link{background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline}</style>
 <a href="/">← VideoRepo</a><h1>Cámara</h1>
-<!-- En vivo por WebRTC (~0,3 s) con go2rtc en el mismo host; con webrtc,mse el reproductor se quedaba en MSE (~1 s más). -->
+<!-- Por HTTP en la LAN: WebRTC directo a go2rtc (:1984). Por HTTPS (tailnet, la app del celular): go2rtc en el mismo
+     origen bajo /go2rtc (tailscale serve) y por MSE, que viaja por el WebSocket HTTPS y anda en casa o afuera;
+     un iframe http dentro de una página https lo bloquearía el navegador por contenido mixto. -->
 <iframe id="live" title="Cámara de la entrada en vivo" allow="autoplay; fullscreen" allowfullscreen></iframe>
 <img id="photo" alt="Imagen actual de la cámara" hidden>
 <div class="pad" role="group" aria-label="Mover la cámara (mantené apretado; flechas del teclado)">
@@ -15,7 +18,7 @@
 <h2>Grabaciones por movimiento</h2><ul id="clips"></ul>
 <script>
 const live=document.querySelector('#live'), photo=document.querySelector('#photo'), state=document.querySelector('#state'), toggle=document.querySelector('#toggle'), clips=document.querySelector('#clips');
-live.src='http://'+location.hostname+':1984/stream.html?src=entrada&mode=webrtc';
+live.src=location.protocol==='https:'?'/go2rtc/stream.html?src=entrada&mode=mse':'http://'+location.hostname+':1984/stream.html?src=entrada&mode=webrtc';
 let photoMode=false, timer=null;
 function refresh(){if(photoMode&&!document.hidden)photo.src='/camara/imagen?t='+Date.now()}
 photo.onload=()=>{if(!photoMode)return;state.firstChild.textContent='Foto de las '+new Date().toLocaleTimeString()+'. ';timer=setTimeout(refresh,1000)};

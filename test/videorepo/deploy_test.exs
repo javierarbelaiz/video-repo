@@ -187,4 +187,19 @@ defmodule Videorepo.DeployTest do
     assert py =~ "def wait_ready"
     assert py =~ "se saltea esta corrida"
   end
+  test "la página elige el reproductor por protocolo" do
+    html = read("priv/static/camera.html")
+    assert html =~ "location.protocol==='https:'"
+    assert html =~ "/go2rtc/stream.html?src=entrada&mode=mse"
+    assert html =~ ":1984/stream.html?src=entrada&mode=webrtc"
+    assert html =~ ~s(<link rel="manifest" href="/manifest.webmanifest">)
+  end
+
+  test "el manifest instala la cámara como app" do
+    m = read("priv/static/manifest.webmanifest") |> Jason.decode!()
+    assert m["name"] == "Cámara"
+    assert m["start_url"] == "/camara"
+    assert m["display"] == "standalone"
+    assert Enum.any?(m["icons"], &(&1["src"] == "/icon.svg" and &1["sizes"] == "any"))
+  end
 end

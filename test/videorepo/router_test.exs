@@ -189,4 +189,12 @@ defmodule Videorepo.RouterTest do
       assert_receive :stop, 5_000
     end
   end
+  test "sirve el manifest y el ícono de la app de la cámara" do
+    conn = conn(:get, "/manifest.webmanifest") |> call()
+    assert conn.status == 200
+    assert hd(get_resp_header(conn, "content-type")) =~ ~r/^application\/manifest\+json/
+    icon = conn(:get, "/icon.svg") |> call()
+    assert icon.status == 200
+    assert hd(get_resp_header(icon, "content-type")) =~ ~r/^image\/svg\+xml/
+  end
 end

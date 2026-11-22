@@ -60,6 +60,12 @@ defmodule Videorepo.Router do
     end
   end
 
+  defp send_static(conn, rel, type) do
+    conn
+    |> put_resp_content_type(type)
+    |> send_file(200, Path.join([:code.priv_dir(:videorepo), "static", rel]))
+  end
+
   defp send_page(conn, rel) do
     conn
     |> put_resp_content_type("text/html")
@@ -73,6 +79,10 @@ defmodule Videorepo.Router do
   get "/", do: send_page(conn, "index.html")
 
   get "/camara", do: send_page(conn, "camera.html")
+
+  # App instalable desde Chrome (PWA): sin el content-type de manifest, Chrome no lo toma.
+  get "/manifest.webmanifest", do: send_static(conn, "manifest.webmanifest", "application/manifest+json")
+  get "/icon.svg", do: send_static(conn, "icon.svg", "image/svg+xml")
 
   # Control del motor de la cámara (PTZ): la página manda la orden acá, se valida y se reenvía al grabador
   # del box, que es el que tiene las credenciales ONVIF. Solo pasan dirección, velocidad y duración válidas.
