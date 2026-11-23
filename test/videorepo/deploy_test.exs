@@ -80,6 +80,21 @@ defmodule Videorepo.DeployTest do
       refute job =~ "readOnly: true"
     end
 
+    test "depurador y sync leen la misma retención (sino sync reimporta lo depurado)" do
+      cm = doc("ConfigMap", "camara-retencion")
+      assert cm, "falta el ConfigMap camara-retencion"
+      assert cm =~ ~s(RETENTION_DAYS: "30")
+      for name <- ~w(camara-depurador camara-sync) do
+        job = doc("CronJob", name)
+        assert job =~ ~r/name: RETENTION_DAYS\s*\n\s*valueFrom: \{ configMapKeyRef: \{ name: camara-retencion, key: RETENTION_DAYS \} \}/,
+               "#{name} no toma RETENTION_DAYS del ConfigMap"
+      end
+    end
+
+    test "restic.ps1 no corta la salida de ssh con Select-Object (mata a ssh y da código -1)" do
+      refute read("deploy/restic.ps1") =~ ~r/& ssh[^\n]*\|\s*Select-Object/
+    end
+
     test "está en la kustomización" do
       assert read("k8s/kustomization.yaml") =~ ~r/^  - camara-depurador\.yaml$/m
     end

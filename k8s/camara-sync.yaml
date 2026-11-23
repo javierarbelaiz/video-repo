@@ -37,6 +37,9 @@ spec:
                 - { name: FFPROBE, value: /data/videos/.tools/ffprobe }
                 - { name: FFMPEG, value: /data/videos/.tools/ffmpeg }
                 - { name: TMPDIR, value: /tmp }
+                # La misma retención que camara-depurador: no reimporta grabaciones ya depuradas.
+                - name: RETENTION_DAYS
+                  valueFrom: { configMapKeyRef: { name: camara-retencion, key: RETENTION_DAYS } }
               resources:
                 requests: { cpu: 20m, memory: 48Mi }
                 limits: { memory: 512Mi }

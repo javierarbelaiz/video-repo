@@ -23,23 +23,25 @@ args = sys.argv[1:]
 with open(os.environ["FAKE_LOG"], "a") as log:
     log.write(json.dumps(args) + "\n")
 if args[0] == "backup":
-    if os.environ.get("FAKE_BACKUP_RC", "0") != "0":
+    rc = int(os.environ.get("FAKE_BACKUP_RC", "0"))
+    if rc not in (0, 3):
         sys.stderr.write("Fatal: unable to open repository\n")
-        sys.exit(int(os.environ["FAKE_BACKUP_RC"]))
+        sys.exit(rc)
     files = [l.strip() for l in open(args[args.index("--files-from") + 1]) if l.strip()]
+    # rc 3 = como restic real: no pudo leer un archivo, igual guarda el snapshot sin él.
+    omit = os.environ.get("FAKE_UNREADABLE", "")
+    files = [f for f in files if not (omit and f.endswith(omit))]
     with open(os.environ["FAKE_STATE"], "w") as state:
         json.dump(files, state)
     print(json.dumps({"message_type": "status", "percent_done": 1}))
     print(json.dumps({"message_type": "summary", "files_new": len(files), "snapshot_id": "abc123"}))
+    sys.exit(rc)
 elif args[0] == "ls":
     assert args[-1] == "abc123", args
     files = json.load(open(os.environ["FAKE_STATE"]))
-    omit = os.environ.get("FAKE_LS_OMIT", "")
     print(json.dumps({"message_type": "snapshot", "id": "abc123"}))
     print(json.dumps({"message_type": "node", "type": "dir", "path": "/data"}))
     for f in files:
-        if omit and f.endswith(omit):
-            continue
         print(json.dumps({"message_type": "node", "type": "file", "path": f, "name": os.path.basename(f)}))
 '''
 
@@ -68,13 +70,13 @@ class PurgeTest(unittest.TestCase):
         for name in (OLD, OLD2, NEW, "Pelicula.mp4"):
             (self.videos / name).write_bytes(b"x")
         fake = root / "fake_restic.py"
-        fake.write_text(FAKE)
+        fake.write_text(FAKE, encoding="utf-8")
         self.cmd = [sys.executable, str(fake)]
         self.log = root / "calls.log"
         os.environ["FAKE_LOG"] = str(self.log)
         os.environ["FAKE_STATE"] = str(root / "state.json")
         os.environ.pop("FAKE_BACKUP_RC", None)
-        os.environ.pop("FAKE_LS_OMIT", None)
+        os.environ.pop("FAKE_UNREADABLE", None)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -88,8 +90,9 @@ class PurgeTest(unittest.TestCase):
         return sorted(p.name for p in self.videos.iterdir())
 
     def test_respalda_y_borra_solo_los_viejos(self):
-        deleted = dep.purge(self.videos, TODAY, 30, self.cmd)
-        self.assertEqual(sorted(deleted), sorted([OLD, OLD2]))
+        result = dep.purge(self.videos, TODAY, 30, self.cmd)
+        self.assertEqual(sorted(result.deleted), sorted([OLD, OLD2]))
+        self.assertFalse(result.incomplete)
         self.assertEqual(self.remaining(), sorted([NEW, "Pelicula.mp4"]))
         backup = self.calls()[0]
         self.assertEqual(backup[0], "backup")
@@ -99,7 +102,7 @@ class PurgeTest(unittest.TestCase):
     def test_sin_candidatos_no_llama_a_restic(self):
         (self.videos / OLD).unlink()
         (self.videos / OLD2).unlink()
-        self.assertEqual(dep.purge(self.videos, TODAY, 30, self.cmd), [])
+        self.assertEqual(dep.purge(self.videos, TODAY, 30, self.cmd).deleted, [])
         self.assertEqual(self.calls(), [])
 
     def test_si_falla_el_backup_no_borra_nada(self):
@@ -108,11 +111,31 @@ class PurgeTest(unittest.TestCase):
             dep.purge(self.videos, TODAY, 30, self.cmd)
         self.assertEqual(self.remaining(), sorted([OLD, OLD2, NEW, "Pelicula.mp4"]))
 
-    def test_lo_que_no_esta_en_el_snapshot_no_se_borra(self):
-        os.environ["FAKE_LS_OMIT"] = OLD2
-        deleted = dep.purge(self.videos, TODAY, 30, self.cmd)
-        self.assertEqual(deleted, [OLD])
+    def test_un_clip_ilegible_no_frena_a_los_demas(self):
+        # restic sale con 3 y guarda el snapshot sin el ilegible: ese queda, el resto se depura,
+        # y la corrida se marca incompleta para que el Job quede fallido y se vea.
+        os.environ["FAKE_BACKUP_RC"] = "3"
+        os.environ["FAKE_UNREADABLE"] = OLD2
+        result = dep.purge(self.videos, TODAY, 30, self.cmd)
+        self.assertEqual(result.deleted, [OLD])
+        self.assertTrue(result.incomplete)
         self.assertIn(OLD2, self.remaining())
+
+    def test_un_borrado_que_falla_no_corta_la_corrida(self):
+        real_remove = dep.os.remove
+
+        def flaky(path):
+            if path.endswith(OLD):
+                raise FileNotFoundError(path)
+            real_remove(path)
+
+        dep.os.remove = flaky
+        try:
+            result = dep.purge(self.videos, TODAY, 30, self.cmd)
+        finally:
+            dep.os.remove = real_remove
+        self.assertEqual(result.deleted, [OLD2])
+        self.assertTrue(result.incomplete)
 
 
 if __name__ == "__main__":

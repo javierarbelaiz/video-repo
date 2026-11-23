@@ -8,7 +8,7 @@
 param([Parameter(Position = 0)][ValidateSet("cargar", "aplicar")][string]$Accion = "cargar")
 $ErrorActionPreference = "Stop"
 $NodeHost = if ($env:NODE_HOST) { $env:NODE_HOST } else { "thehook@mykaly" }
-$BoxHost = if ($env:BOX_HOST) { $env:BOX_HOST } else { "celes@javierdesktop.local" }
+$BoxHost = if ($env:BOX_HOST) { $env:BOX_HOST } else { "celes@100.115.232.92" }
 $RestUser = if ($env:REST_USER) { $env:REST_USER } else { "gilway" }
 $RestPort = 8000
 $Root = Split-Path $PSScriptRoot -Parent
@@ -30,9 +30,12 @@ function Temporal {
 }
 
 function Leer-DelBox([string]$Comando, [string]$Que) {
-    $valor = (& ssh -o BatchMode=yes $BoxHost $Comando 2>$null | Select-Object -First 1)
-    if ($LASTEXITCODE -ne 0 -or -not $valor -or -not $valor.Trim()) { throw "no pude leer $Que del box ($BoxHost)" }
-    return $valor.Trim()
+    # Toda la salida primero: cortar la tubería (Select-Object -First) mata a ssh y deja $LASTEXITCODE en -1.
+    $salida = @(& ssh -o BatchMode=yes $BoxHost $Comando 2>$null)
+    $codigo = $LASTEXITCODE
+    $valor = if ($salida.Count -gt 0) { "$($salida[0])".Trim() } else { "" }
+    if ($codigo -ne 0 -or -not $valor) { throw "no pude leer $Que del box ($BoxHost, ssh salió con $codigo)" }
+    return $valor
 }
 
 if ($Accion -eq "aplicar") {

@@ -1,6 +1,16 @@
 # Depura los clips de la cámara (CamNet_record_*) de más de 30 días: primero los respalda con restic en el
 # repo del box (rest-server append-only por la tailnet, Secret camara-restic) y recién después los borra.
 # Si restic falla no se borra nada y el Job queda fallido. Los videos para la TV no se tocan.
+#
+# La retención vive en un solo lugar: camara-sync la lee también para no reimportar lo que ya se depuró.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: camara-retencion
+  namespace: videorepo
+data:
+  RETENTION_DAYS: "30"
+---
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -30,7 +40,8 @@ spec:
               command: ["python3", "/app/scripts/depurar_camara.py"]
               env:
                 - { name: VIDEO_DIR, value: /data/videos }
-                - { name: RETENTION_DAYS, value: "30" }
+                - name: RETENTION_DAYS
+                  valueFrom: { configMapKeyRef: { name: camara-retencion, key: RETENTION_DAYS } }
                 - { name: RESTIC_CACHE_DIR, value: /tmp/restic-cache }
                 - name: RESTIC_REPOSITORY
                   valueFrom: { secretKeyRef: { name: camara-restic, key: RESTIC_REPOSITORY } }
