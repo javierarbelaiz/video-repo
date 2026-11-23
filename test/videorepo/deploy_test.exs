@@ -215,6 +215,12 @@ defmodule Videorepo.DeployTest do
       app = doc("Deployment", "go2rtc")
       assert app =~ "secretRef: { name: camara-relay }"
     end
+
+    test "ofrece entrada_hd (ch0) bajo demanda", %{cfg: cfg} do
+      # La foto del vigía sale de ch0; go2rtc abre la sesión solo mientras alguien lo pide.
+      assert cfg =~ "entrada_hd: rtsp://${CAM_USER}:${CAM_PASS}@${CAM_HOST}/live/ch0"
+      assert cfg =~ ~r/^\s+entrada: rtsp:\/\/\$\{CAM_USER\}:\$\{CAM_PASS\}@\$\{CAM_HOST\}\/live\/ch1$/m
+    end
   end
 
   test "la página de la cámara usa WebRTC con go2rtc en el mismo host" do

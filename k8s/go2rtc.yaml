@@ -42,6 +42,9 @@ data:
         - ${NODE_IP}:8555
     streams:
       entrada: rtsp://${CAM_USER}:${CAM_PASS}@${CAM_HOST}/live/ch1
+      # ch0 (HEVC 2304x1296) para la foto ampliada del vigía: go2rtc abre la sesión con la cámara solo
+      # mientras alguien lo pide, y la cierra al irse el último consumidor.
+      entrada_hd: rtsp://${CAM_USER}:${CAM_PASS}@${CAM_HOST}/live/ch0
 ---
 apiVersion: apps/v1
 kind: Deployment
