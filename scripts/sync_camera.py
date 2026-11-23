@@ -5,6 +5,7 @@ import re
 import subprocess
 import tempfile
 import time
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.request import urlopen
 from shutil import copyfileobj
@@ -15,6 +16,22 @@ CAM = os.environ.get("CAMERA_URL", "").rstrip("/")
 REPO = os.environ.get("REPO_URL", "http://videorepo.videorepo.svc.cluster.local").rstrip("/")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
+
+
+RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "30"))
+
+
+def is_too_old(name, today, days):
+    """El depurador saca de VideoRepo los clips de más de `days` días; si el original sigue en el grabador
+    no hay que volver a importarlo. La fecha sale del nombre (record_YYYYMMDD_...)."""
+    match = re.fullmatch(r"record_(\d{8})_\d{6}_\d+\.mp4", name)
+    if not match:
+        return False
+    try:
+        recorded = datetime.strptime(match.group(1), "%Y%m%d").date()
+    except ValueError:
+        return False
+    return recorded < today - timedelta(days=days)
 
 
 def read_json(url):
@@ -45,6 +62,8 @@ def sync():
     for item in candidates:
         name = item["file"]
         if not re.fullmatch(r"record_[0-9_]+\.mp4", name) or name == active:
+            continue
+        if is_too_old(name, date.today(), RETENTION_DAYS):
             continue
         dest = "CamNet_" + name
         if dest in existing:
