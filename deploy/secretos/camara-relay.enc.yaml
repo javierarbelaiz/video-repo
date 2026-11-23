@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: camara-relay
+    namespace: videorepo
+type: Opaque
+stringData:
+    RELAY_USER: ENC[AES256_GCM,data:/tbOLDgVqek=,iv:3RnyFbWx0Cwvt/TFrJAf/YgFhk6kDRGIVyrVmnlXUSI=,tag:x3sE33UM/sPJz00unznDSw==,type:str]
+    RELAY_PASS: ENC[AES256_GCM,data:hiMHeCB7tjyzmtHZQyTB6LcoSY5I0fRh//jSolnDvxM=,iv:lba08hHCiMpyyuaU3tmgBlNjYIhsmXOZ7yu3bnfxVQ0=,tag:vp2LKDT57Ch7cIFIfeRUoQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBmTzBNbWNKR3FtZXVKcHB3
+            azc3WWV6dFowQWRsNWRKcnVJL2ptK2tvM21zClk2V2NoWlNObi9JaENtWE9lY2Fn
+            dHNnWWd4NjB4YjZuc2pVa244eldOQk0KLS0tIEovWlZFKzlxbmsxNUZ5WCt2THlB
+            eWRmQy94NE1lU1picGxZSE1zMUNrdG8KTvACs6L4dgrhyhu6BF5ds4WtXfzhN/YR
+            9woUlxJexFaFMiMomAt+34U9ztIzIfDtwd99dnKm0zvdNhN2VMnolQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age138ph6qsw2genyv3dhkvh2jwaqkw9436mmls3607mu45mpqpw5ums6j0m8a
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-23T11:12:52Z"
+    mac: ENC[AES256_GCM,data:s7t1aPWNm50b9KGYKVqGWZ/chRijWTIGYrvxQ3Wu7qo9WQOxBdsx+crIDz5OnpPKI6R3K1EMH/MOrbdK8h7HA28q6GIZX1we43Rnh2p0BCHjj71pVen6yDdL4ivdVvuVlhrRTROVZpKz4N9xR3k981b+QtbDGzxlBsxZKjQ7sD4=,iv:eELaTL5yoS4+qUKeSRArX2vRQ+VQXu84yp4GIE5tbRc=,tag:o17kVz3j3pqJuYk03CTqQA==,type:str]
+    version: 3.13.3

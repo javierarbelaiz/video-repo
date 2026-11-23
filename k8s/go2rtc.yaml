@@ -3,7 +3,8 @@
 #
 # Sin IPs ni credenciales en el repo: la config usa variables que go2rtc expande al arrancar.
 #   CAM_USER, CAM_PASS, CAM_HOST  -> Secret camara-rtsp (CAM_PASS ya codificada para URL)
-#   NODE_IP                       -> Secret videorepo-red (candidato WebRTC)
+#   NODE_IP                       -> Secret videorepo-red (candidato WebRTC y relé RTSP)
+#   RELAY_USER, RELAY_PASS        -> Secret camara-relay (relé RTSP :8554 para el grabador del box)
 # hostNetwork en mykaly: WebRTC necesita que el navegador llegue directo al puerto 8555 del nodo.
 apiVersion: v1
 kind: ConfigMap
@@ -27,8 +28,13 @@ data:
         - /api/ws
         - /api/webrtc
         - /api/frame.jpeg
+    # Relé RTSP para el grabador del box: así la cámara atiende una sola sesión (esta) y es go2rtc el que
+    # reconecta tras un corte. Con varias sesiones directas la cámara se trababa (2026-11-23).
+    # Solo en la IP de la LAN y con usuario/clave propios (Secret camara-relay, no los de la cámara).
     rtsp:
-      listen: ""
+      listen: "${NODE_IP}:8554"
+      username: "${RELAY_USER}"
+      password: "${RELAY_PASS}"
     webrtc:
       # Atado a la IP de la LAN: con ":8555" go2rtc no abría UDP en wlan1 y el navegador caía a MSE.
       listen: "${NODE_IP}:8555"
@@ -64,6 +70,7 @@ spec:
           image: alexxit/go2rtc:1.9.15@sha256:e098de5c2f8040dc3d4784ed2d5cfdac3b0979f9349afe587ef6a670a14b9f4d
           envFrom:
             - secretRef: { name: camara-rtsp }
+            - secretRef: { name: camara-relay }
           env:
             - name: NODE_IP
               valueFrom: { secretKeyRef: { name: videorepo-red, key: NODE_IP } }

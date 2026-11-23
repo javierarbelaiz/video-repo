@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: camara-restic
+    namespace: videorepo
+type: Opaque
+stringData:
+    RESTIC_REPOSITORY: ENC[AES256_GCM,data:CL1AhV2bUgngs7xIQB98xehG+YBtDEKOGl9FngZxhTS8yjtewSTN3jbFRstRxA6H+qVUVAk4ITptYdAYMuYEMOASrMBnhiv0Cbx9YOYkBm04R7Vbq3M=,iv:FfXcPsELGnsPP79mb6fF5bByJuQa38dB8HQ3wboaeIs=,tag:kRWx/G4sunjWJ/d6E+bY7A==,type:str]
+    RESTIC_PASSWORD: ENC[AES256_GCM,data:F90i6uVGotYe4ctcOtQkfsWsx6DD8dwAQRFnHsVjGpxoFsMivc+prUQhSGg=,iv:ZgGCVeGG7mTYKhdJYImYY6y0v8TOC9OtKf5ofRWW7LU=,tag:8uKZjRCuvYeNkAXrpRj7iQ==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBEWGNIY3JBbmdKZ3ViYTNa
+            andpQ3dvSkR3Vy93a0k0bnhUZjZ2VGVKTENnCjN6dGVFaDRYK2Q4SjMxYit4NUFh
+            UHJvNWVtdFB0YzlvU3lKT2dPNXVMVXcKLS0tIDZ0V1B6NnMrRTQwMUV3YUJ5eXdi
+            WWlpYms4TG9nVWFVaTlBSWluTU5GWk0KAcRoMcRhGHWt+nXC9806ZafqBEnvkexj
+            4ZLqz9YgVB5VubcWphZIm9bwO03JRB6AUCyI57hXajlilC2idqGoIQ==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age138ph6qsw2genyv3dhkvh2jwaqkw9436mmls3607mu45mpqpw5ums6j0m8a
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-23T10:29:03Z"
+    mac: ENC[AES256_GCM,data:zvj70j3BvQ4i+hhXSxqrBKiDDMyeUflHOK3qj/dRRJWN+H+7aE6hf4Yrrt0PhMgDzMGlg638+BAi3EKqTpGPhyTxGEuu2MYnsQ+e7PJRLfXSw9bHNGlnioWQx+vOGioVZUL6T42HWFcsOWFk84ZxKhs9y7+HWwFvXmazwwbWh2E=,iv:WuPgTpRYgn7QyZGatPNS3sRS4wSHreTH1UdjhTWrDjE=,tag:83u6IdbWYlGLQzuDjuOJaw==,type:str]
+    version: 3.13.3

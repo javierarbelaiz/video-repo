@@ -202,8 +202,13 @@ defmodule Videorepo.DeployTest do
       assert cfg =~ "- ${NODE_IP}:8555"
     end
 
-    test "no reexpone la cámara por RTSP en la red", %{cfg: cfg} do
-      assert cfg =~ ~r/rtsp:\s*\n\s+listen: ""/
+    test "reparte la cámara por RTSP solo en la IP del nodo y con usuario y clave", %{cfg: cfg} do
+      # El grabador del box toma el video de acá: la cámara atiende una sola sesión (la de go2rtc).
+      assert cfg =~ ~r/rtsp:\s*\n\s+listen: "\$\{NODE_IP\}:8554"/
+      assert cfg =~ ~s(username: "${RELAY_USER}")
+      assert cfg =~ ~s(password: "${RELAY_PASS}")
+      app = doc("Deployment", "go2rtc")
+      assert app =~ "secretRef: { name: camara-relay }"
     end
   end
 
