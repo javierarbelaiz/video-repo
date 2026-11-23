@@ -6,6 +6,7 @@ namespace: videorepo
 resources:
   - app.yaml
   - camara-sync.yaml
+  - camara-depurador.yaml
   - go2rtc.yaml
 images:
   - name: ghcr.io/javierarbelaiz/videorepo

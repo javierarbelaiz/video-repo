@@ -66,6 +66,41 @@ defmodule Videorepo.DeployTest do
     assert job =~ "backoffLimit: 2"
   end
 
+  describe "depurador de clips de la cámara" do
+    test "corre una vez por día, sin solaparse, con el repo de restic del Secret" do
+      job = doc("CronJob", "camara-depurador")
+      assert job, "falta el CronJob camara-depurador"
+      assert job =~ ~s(schedule: "0 5 * * *")
+      assert job =~ "concurrencyPolicy: Forbid"
+      assert job =~ "/app/scripts/depurar_camara.py"
+      assert job =~ "camara-restic"
+      for key <- ~w(RESTIC_REPOSITORY RESTIC_PASSWORD), do: assert(job =~ "key: #{key}")
+      assert job =~ "claimName: videos"
+      # Borra clips: el volumen tiene que estar montado con escritura.
+      refute job =~ "readOnly: true"
+    end
+
+    test "está en la kustomización" do
+      assert read("k8s/kustomization.yaml") =~ ~r/^  - camara-depurador\.yaml$/m
+    end
+
+    test "la imagen trae restic 0.17.3 verificado por sha256" do
+      df = read("Dockerfile")
+      assert df =~ "ARG RESTIC_VERSION=0.17.3"
+      assert df =~ "restic_${RESTIC_VERSION}_linux_amd64.bz2"
+      assert df =~ "5097faeda6aa13167aae6e36efdba636637f8741fed89bbf015678334632d4d3"
+      assert df =~ "sha256sum -c"
+      assert df =~ "scripts/depurar_camara.py"
+    end
+
+    test "CI corre los tests de los scripts de Python antes de publicar" do
+      wf = read(".github/workflows/deploy.yml")
+      {py, _} = :binary.match(wf, "python3 -m unittest discover -s test/python")
+      {push, _} = :binary.match(wf, "docker/build-push-action")
+      assert py < push
+    end
+  end
+
   test "el mDNS no se declara acá: es de la Application mdns-videorepo" do
     refute doc("Deployment", "mdns-videorepo")
     refute File.exists?(Path.join(@root, "k8s/mdns.yaml"))

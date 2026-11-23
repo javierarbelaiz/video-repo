@@ -61,6 +61,12 @@ El camino normal es **push a `main`**:
   `tailscale serve --bg --https=8444 --set-path=/go2rtc http://127.0.0.1:1984`
 - **Clips por movimiento:** el grabador del box los escribe en MPEG-4 Part 2; `camara-sync` los convierte a
   H.264 (`+faststart`) antes de subirlos, para que se vean en el navegador y la TV.
+- **Depurador de clips (30 días):** el CronJob `camara-depurador` (05:00) toma los `CamNet_record_*.mp4` con
+  fecha (del nombre) de más de 30 días, los guarda con restic en el repo del box (`--host videorepo --tag camara`,
+  rest-server append-only por la tailnet) y borra del volumen solo los que quedaron en el snapshot. Si restic
+  falla no borra nada. Los videos para la TV no se tocan; `camara-sync` no reimporta lo depurado. El repo y su
+  clave viven en el Secret `camara-restic`: `deploy/restic.ps1` los lee del box y lo carga (copia SOPS en
+  `deploy/secretos/`). Restaurar desde el box: `restic -r M:\restic restore latest --tag camara --target <dir>`.
 - **Datos:** el Namespace y el PVC `videos` llevan `Prune=false,Delete=false`: Argo nunca los borra.
 - Al arrancar, el contenedor (`rel/boot.sh`) deja ffmpeg/yt-dlp/deno en el volumen (yt-dlp se
   actualiza en cada arranque) y genera el certificado HTTPS si falta.

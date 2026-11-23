@@ -1,0 +1,50 @@
+# Depura los clips de la cámara (CamNet_record_*) de más de 30 días: primero los respalda con restic en el
+# repo del box (rest-server append-only por la tailnet, Secret camara-restic) y recién después los borra.
+# Si restic falla no se borra nada y el Job queda fallido. Los videos para la TV no se tocan.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: camara-depurador
+  namespace: videorepo
+spec:
+  # 05:00: lejos del Nightly del box (02:30) que usa el mismo repo.
+  schedule: "0 5 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 2
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 7200
+      template:
+        metadata:
+          labels: { app: camara-depurador }
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - { name: ghcr-pull }
+          containers:
+            - name: depurador
+              image: ghcr.io/javierarbelaiz/videorepo
+              command: ["python3", "/app/scripts/depurar_camara.py"]
+              env:
+                - { name: VIDEO_DIR, value: /data/videos }
+                - { name: RETENTION_DAYS, value: "30" }
+                - { name: RESTIC_CACHE_DIR, value: /tmp/restic-cache }
+                - name: RESTIC_REPOSITORY
+                  valueFrom: { secretKeyRef: { name: camara-restic, key: RESTIC_REPOSITORY } }
+                - name: RESTIC_PASSWORD
+                  valueFrom: { secretKeyRef: { name: camara-restic, key: RESTIC_PASSWORD } }
+              resources:
+                requests: { cpu: 20m, memory: 64Mi }
+                limits: { memory: 768Mi }
+              volumeMounts:
+                - { name: videos, mountPath: /data/videos }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: videos
+              persistentVolumeClaim:
+                claimName: videos
+            - name: tmp
+              emptyDir: { sizeLimit: 1Gi }

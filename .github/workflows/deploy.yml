@@ -49,6 +49,7 @@ jobs:
           mix local.hex --force && mix local.rebar --force
           mix deps.get
           mix test
+          python3 -m unittest discover -s test/python
 
       - name: Etiqueta
         id: tag
