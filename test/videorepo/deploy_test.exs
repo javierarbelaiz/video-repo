@@ -91,6 +91,11 @@ defmodule Videorepo.DeployTest do
       end
     end
 
+    test "relay.ps1 saca el BOM que PowerShell 5.1 mete al pasar la URL por stdin" do
+      # Con el BOM la URL del relé es inválida y el grabador termina en la cámara directa.
+      assert read("deploy/relay.ps1") =~ "IndexOf('rtsp://')"
+    end
+
     test "restic.ps1 no corta la salida de ssh con Select-Object (mata a ssh y da código -1)" do
       refute read("deploy/restic.ps1") =~ ~r/& ssh[^\n]*\|\s*Select-Object/
     end

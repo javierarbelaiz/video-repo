@@ -69,8 +69,10 @@ try {
     $url = "rtsp://${RelayUser}:${clave}@${nodeIp}:8554/entrada"
     $script = @"
 `$f = '$BoxEnv'
+# PowerShell 5.1 antepone un BOM al stdin de ssh y del otro lado llega como basura: se corta todo lo previo a rtsp://.
 `$url = [Console]::In.ReadLine()
-`$lineas = @(if (Test-Path `$f) { Get-Content `$f | Where-Object { `$_ -notmatch '^\s*RTSP_URL=' } })
+`$url = `$url.Substring([Math]::Max(0, `$url.IndexOf('rtsp://'))).Trim()
+`$lineas = @(if (Test-Path `$f) { Get-Content `$f -Encoding UTF8 | ForEach-Object { `$_.TrimStart([char]0xFEFF) } | Where-Object { `$_ -notmatch '^\s*RTSP_URL=' } })
 `$lineas += "RTSP_URL=`$url"
 [IO.File]::WriteAllLines(`$f, `$lineas, (New-Object Text.UTF8Encoding(`$false)))
 'ok'
